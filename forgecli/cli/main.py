@@ -13,9 +13,10 @@ from forgecli.cli import (
     commands_build,
     commands_commit,
     commands_config,
-    commands_docs,
     commands_doctor,
+    commands_docs,
     commands_explain,
+    commands_forge,
     commands_git,
     commands_graph,
     commands_history,
@@ -24,6 +25,7 @@ from forgecli.cli import (
     commands_model,
     commands_optimizer,
     commands_plan,
+    commands_plugin,
     commands_providers,
     commands_release,
     commands_review,
@@ -59,6 +61,7 @@ app.add_typer(commands_git.app, name="git")
 app.add_typer(commands_history.app, name="history")
 app.add_typer(commands_explain.app, name="explain")
 app.add_typer(commands_doctor.app, name="doctor")
+app.add_typer(commands_plugin.app, name="plugin")
 
 
 def _version_callback(value: bool) -> None:
