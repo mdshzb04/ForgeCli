@@ -60,12 +60,12 @@ class LoadedPlugin:
         return self.manifest.version
 
 
-class PluginManifestNotFound(LookupError):
+class PluginManifestNotFoundError(LookupError):
     """Raised when a plugin's manifest is missing or malformed."""
 
 
-# Backward-compatible alias for the SDK-wide "Error"-suffixed name.
-PluginManifestNotFoundError = PluginManifestNotFound
+# Backward-compatible alias for the legacy name.
+PluginManifestNotFound = PluginManifestNotFoundError
 
 
 def default_plugins_dir() -> Path:

@@ -40,7 +40,7 @@ from forgecli.sdk.interfaces import (
 )
 from forgecli.sdk.loader import (
     LoadedPlugin,
-    PluginManifestNotFound,
+    PluginManifestNotFoundError as PluginManifestNotFound,
     default_plugins_dir,
     discover_entry_points,
     discover_filesystem,
@@ -106,6 +106,7 @@ __all__ = [
     "PluginManager",
     "PluginManifest",
     "PluginManifestNotFound",
+    "PluginManifestNotFoundError",
     "PluginNotFoundError",
     "PluginRegistryState",
     "PluginState",
