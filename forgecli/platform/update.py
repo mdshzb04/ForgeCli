@@ -30,7 +30,7 @@ from typing import Final
 import httpx
 
 from forgecli import __version__ as _current_version
-from forgecli.platform.core import getenv, is_windows
+from forgecli.platform.core import getenv
 from forgecli.platform.paths import data_dir, ensure_directory
 
 DEFAULT_PYPI_URL: Final[str] = "https://pypi.org/pypi/forgecli/json"

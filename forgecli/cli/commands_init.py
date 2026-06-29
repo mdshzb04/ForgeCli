@@ -23,7 +23,6 @@ from rich.panel import Panel
 from rich.table import Table
 
 from forgecli import __version__
-from forgecli.cli.bootstrap import bootstrap_context
 from forgecli.cli.ui import error, get_console, info, success, warn
 from forgecli.utils.paths import ProjectPaths
 
@@ -105,7 +104,7 @@ def main(
             "# Add your API keys here or export them in your shell profile.",
             "",
         ]
-        for provider, key_env in _PROVIDER_KEYS:
+        for _provider, key_env in _PROVIDER_KEYS:
             value = os.environ.get(key_env, "")
             if value:
                 env_lines.append(f"{key_env}={value}")
