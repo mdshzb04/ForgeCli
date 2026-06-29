@@ -118,7 +118,7 @@ def _make_orchestrator() -> Orchestrator:
     provider = MockProvider(MockProviderConfig())
     registry = PluginRegistry()
     registry.register_classifier(HeuristicIntentClassifier())
-    registry.register_workflow(BuildWorkflow(provider=provider))
+    registry.register_workflow(BuildWorkflow(provider=provider, test_command="true"))
     registry.register_workflow(PlanWorkflow())
     registry.register_workflow(AskWorkflow())
     registry.register_workflow(ReviewWorkflow())
@@ -223,6 +223,7 @@ def test_build_workflow_uses_mock_provider() -> None:
     provider = MockProvider(MockProviderConfig())
     registry = PluginRegistry()
     registry.register_classifier(HeuristicIntentClassifier())
+    registry.register_workflow(BuildWorkflow(provider=provider, test_command="true"))
     orch = Orchestrator(registry, provider=provider)
     # The mock provider echoes the prompt, so no diff is produced; the
     # build still completes successfully and the summary is populated.
