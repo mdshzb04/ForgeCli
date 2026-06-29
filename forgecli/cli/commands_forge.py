@@ -42,7 +42,7 @@ _REGISTRY = PluginRegistry()
 _REGISTRY.register_classifier(HeuristicIntentClassifier())
 
 
-def _register_default_workflows(provider) -> None:
+def _register_default_workflows(provider, *, test_command: str | None = None) -> None:
     """Register the seven default workflow *instances* under their
     canonical names. Idempotent: re-registering with a different
     provider replaces the previous binding.
@@ -58,7 +58,7 @@ def _register_default_workflows(provider) -> None:
     )
 
     defaults = [
-        BuildWorkflow(provider=provider),
+        BuildWorkflow(provider=provider, test_command=test_command),
         PlanWorkflow(),
         AskWorkflow(),
         DocsWorkflow(),
@@ -191,8 +191,11 @@ async def run_forge(
     internal Typer sub-app in :mod:`commands_forge` is still wired
     for forward-compatibility.
     """
+    # When tests are disabled, pass a no-op test command so the
+    # build workflow's test stage succeeds instantly.
+    test_command = "true" if no_tests else None
     provider = _build_provider_for(live=live, cwd=path)
-    _register_default_workflows(provider)
+    _register_default_workflows(provider, test_command=test_command)
     orchestrator = Orchestrator(_REGISTRY, provider=provider)
     result = await orchestrator.run(text)
 
