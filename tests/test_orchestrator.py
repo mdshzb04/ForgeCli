@@ -6,6 +6,8 @@ import asyncio
 import textwrap
 from pathlib import Path
 
+import pytest
+
 from forgecli.orchestrator import (
     AskWorkflow,
     BuildWorkflow,
@@ -236,6 +238,7 @@ def test_build_workflow_uses_mock_provider() -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.slow
 def test_docs_workflow_writes_overview(tmp_path: Path) -> None:
     provider = MockProvider(MockProviderConfig())
     registry = PluginRegistry()

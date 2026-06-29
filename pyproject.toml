@@ -43,6 +43,7 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
     "pytest-cov>=4.1.0",
+    "pytest-timeout>=2.3.0",
     "ruff>=0.4.0",
     "mypy>=1.10.0",
     "types-PyYAML",
@@ -88,9 +89,13 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 minversion = "8.0"
-addopts = "-ra -q --strict-markers"
+addopts = "-ra -q --strict-markers -m 'not slow'"
 testpaths = ["tests"]
 asyncio_mode = "auto"
+timeout = 30
+markers = [
+    "slow: marks tests as slow integration tests (deselect with '-m not slow')",
+]
 
 [tool.coverage.run]
 source = ["forgecli"]

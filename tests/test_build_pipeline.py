@@ -287,6 +287,7 @@ def test_llm_stage_calls_provider(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.slow
 def test_default_pipeline_runs_end_to_end(tmp_path: Path) -> None:
     provider = MockProvider(MockProviderConfig())
     # Patch the mock provider's chat to return a real diff.
@@ -379,6 +380,7 @@ def test_llm_stage_does_not_retry_on_permanent_failure(tmp_path: Path) -> None:
     assert provider.calls == 1
 
 
+@pytest.mark.slow
 def test_pipeline_short_circuits_on_stage_failure(tmp_path: Path) -> None:
     provider = MockProvider(MockProviderConfig())
 
@@ -401,6 +403,7 @@ def test_pipeline_short_circuits_on_stage_failure(tmp_path: Path) -> None:
     assert result.failure_stage == "llm"
 
 
+@pytest.mark.slow
 def test_pipeline_records_stage_durations(tmp_path: Path) -> None:
     provider = MockProvider(MockProviderConfig())
     pipeline = default_pipeline(

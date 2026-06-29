@@ -31,6 +31,11 @@ from forgecli.builder.builder import Builder
 from forgecli.builder.builder import BuildResult as LegacyBuildResult
 from forgecli.cli.bootstrap import bootstrap_context
 from forgecli.cli.ui import error, get_console, info, success, table
+from forgecli.engine.runner import (
+    engine_result_to_dict,
+    render_engine_result as engine_summary,
+    run_engine,
+)
 from forgecli.optimizer.ponytail import PromptOptimizer
 from forgecli.providers.base import Provider, ProviderRegistry
 from forgecli.providers.mock import MockProvider, MockProviderConfig
@@ -83,6 +88,11 @@ def build_cmd(
         "--save-diff",
         help="Write the extracted diff to this path (for inspection).",
     ),
+    use_engine: bool = typer.Option(
+        False,
+        "--use-engine",
+        help="Use the new ExecutionEngine pipeline (default: legacy BuildPipeline).",
+    ),
 ) -> None:
     """Run the full pipeline on ``prompt``."""
     if ctx.invoked_subcommand is not None:
@@ -100,8 +110,10 @@ def build_cmd(
             retries=retries,
             json_output=json_output,
             save_diff=save_diff,
+            use_engine=use_engine,
         )
     )
+
 
 
 async def _run_build(
@@ -116,6 +128,7 @@ async def _run_build(
     retries: int,
     json_output: bool,
     save_diff: Path | None,
+    use_engine: bool = False,
 ) -> None:
     context = bootstrap_context(cwd=str(path))
     paths: ProjectPaths = context.paths
@@ -154,6 +167,52 @@ async def _run_build(
         else None
     )
 
+    # -----------------------------------------------------------------------
+    # ExecutionEngine path (--use-engine)
+    # -----------------------------------------------------------------------
+    if use_engine:
+        import asyncio as _asyncio
+        import concurrent.futures
+
+        # run_engine is synchronous (calls asyncio.run internally); we must
+        # run it in a thread to avoid "cannot run nested event loop" errors
+        # when we're already inside asyncio.run from build_cmd.
+        loop = _asyncio.get_event_loop()
+        eng_result = await loop.run_in_executor(
+            None,
+            lambda: run_engine(
+                prompt,
+                target,
+                provider=provider,
+                optimizer=optimizer,
+                graph=graph,
+                test_command=None if no_tests else test_command,
+                retries=retries,
+                skip_tests=no_tests,
+                skip_graph=no_graph,
+                skip_ponytail=no_ponytail,
+            ),
+        )
+        if save_diff is not None and eng_result.context.diff_text:
+            save_diff.write_text(eng_result.context.diff_text, encoding="utf-8")
+            info(f"Diff written to {save_diff}")
+        if json_output:
+            sys.stdout.write(json.dumps(engine_result_to_dict(eng_result), indent=2))
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+            return
+        console = get_console()
+        console.print(engine_summary(eng_result))
+        if eng_result.success:
+            success("Build pipeline finished (ExecutionEngine).")
+        else:
+            error(f"Build failed at stage: {eng_result.failed_stage}")
+            raise typer.Exit(code=1)
+        return
+
+    # -----------------------------------------------------------------------
+    # Legacy BuildPipeline path (default)
+    # -----------------------------------------------------------------------
     build_context = build_context_from(
         prompt,
         root=target,

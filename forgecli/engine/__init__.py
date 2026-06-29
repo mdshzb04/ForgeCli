@@ -27,6 +27,9 @@ from forgecli.engine.context import (
     RetrievalResult,
     StageLog,
 )
+from forgecli.engine.defaults import (
+    default_registry,
+)
 from forgecli.engine.events import (
     EngineCancelledError,
     EngineEvent,
@@ -53,8 +56,19 @@ from forgecli.engine.plugins import (
     register_plugin,
     stage_as_plugin,
 )
+from forgecli.engine.stages import (
+    ContextOptimizerStage,
+    ExecutionEngineStage,
+    GitEngineStage,
+    IntentAnalyzerStage,
+    ModelRouterStage,
+    PlanningEngineStage,
+    RepositoryAnalyzerStage,
+    ValidationEngineStage,
+)
 
 __all__ = [
+    "ContextOptimizerStage",
     "EngineCancelledError",
     "EngineContext",
     "EngineEvent",
@@ -62,13 +76,19 @@ __all__ = [
     "EngineResult",
     "EventBus",
     "ExecutionEngine",
+    "ExecutionEngineStage",
+    "GitEngineStage",
     "HookManager",
     "IntentAnalysis",
+    "IntentAnalyzerStage",
     "LogLevel",
+    "ModelRouterStage",
     "ModelSelection",
     "PipelineBuilder",
+    "PlanningEngineStage",
     "PluginHook",
     "ProgressEvent",
+    "RepositoryAnalyzerStage",
     "RetrievalResult",
     "Stage",
     "StageContext",
@@ -78,6 +98,8 @@ __all__ = [
     "StageResult",
     "StageStatus",
     "TextLogEvent",
+    "ValidationEngineStage",
+    "default_registry",
     "register_plugin",
     "stage_as_plugin",
 ]

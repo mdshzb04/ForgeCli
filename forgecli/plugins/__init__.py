@@ -30,11 +30,14 @@ from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from forgecli.core.context import AppContext
 from forgecli.providers.base import Provider
 from forgecli.review.analyzer import Analyzer
+
+if TYPE_CHECKING:
+    from forgecli.engine.execution import Stage, StageRegistry
 
 
 class Intent(str, Enum):
@@ -117,7 +120,12 @@ class IntentClassifier(ABC):
 
 @dataclass
 class PluginRegistry:
-    """In-memory registry of all loaded plugins."""
+    """In-memory registry of all loaded plugins.
+
+    When *engine_registry* is provided, every call to
+    :meth:`register_stage` or :meth:`replace_stage` is mirrored to
+    the engine's :class:`~forgecli.engine.execution.StageRegistry`.
+    """
 
     providers: dict[str, type[Provider]] = field(default_factory=dict)
     optimizers: dict[str, type] = field(default_factory=dict)
@@ -126,6 +134,7 @@ class PluginRegistry:
     workflows: list[Workflow] = field(default_factory=list)
     stages: dict[str, object] = field(default_factory=dict)  # type: ignore[type-arg]
     configure_hooks: list[Callable[[AppContext], None]] = field(default_factory=list)
+    engine_registry: object | None = None  # StageRegistry, kept loose to avoid import cycles
 
     def register_provider(self, name: str, provider_cls: type[Provider]) -> None:
         self.providers[name] = provider_cls
@@ -149,17 +158,45 @@ class PluginRegistry:
         if stage.name in self.stages:
             raise ValueError(f"Stage {stage.name!r} already registered")
         self.stages[stage.name] = stage
+        self._sync_to_engine_registry(stage)
 
     def replace_stage(self, stage) -> None:  # type: ignore[no-untyped-def]
         """Replace a registered :class:`Stage` (last-writer-wins)."""
         if not getattr(stage, "name", None):
             raise ValueError("Stage.name must be non-empty")
         self.stages[stage.name] = stage
+        self._sync_to_engine_registry(stage, replace=True)
+
+    def _sync_to_engine_registry(self, stage, *, replace: bool = False) -> None:
+        engine_reg = self.engine_registry
+        if engine_reg is None:
+            return
+        try:
+            if replace:
+                engine_reg.replace(stage)
+            else:
+                engine_reg.register(stage)
+        except (ValueError, KeyError):
+            pass
 
     def register_configure_hook(
         self, hook: Callable[[AppContext], None]
     ) -> None:
         self.configure_hooks.append(hook)
+
+    def link_engine_registry(self, engine_registry) -> None:  # type: ignore[no-untyped-def]
+        """Link this plugin registry to an engine :class:`StageRegistry`.
+
+        All existing plugin stages are bulk-registered into the
+        engine registry; future calls to :meth:`register_stage`
+        and :meth:`replace_stage` are mirrored automatically.
+        """
+        self.engine_registry = engine_registry
+        for name, stage in list(self.stages.items()):
+            try:
+                engine_registry.register(stage)
+            except (ValueError, KeyError):
+                engine_registry.replace(stage)
 
     def classifiers_sorted(self) -> list[IntentClassifier]:
         return sorted(self.classifiers, key=lambda c: getattr(c, "priority", 100))
