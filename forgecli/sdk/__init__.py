@@ -40,11 +40,13 @@ from forgecli.sdk.interfaces import (
 )
 from forgecli.sdk.loader import (
     LoadedPlugin,
-    PluginManifestNotFoundError as PluginManifestNotFound,
     default_plugins_dir,
     discover_entry_points,
     discover_filesystem,
     load_filesystem,
+)
+from forgecli.sdk.loader import (
+    PluginManifestNotFoundError as PluginManifestNotFound,
 )
 from forgecli.sdk.manager import (
     PluginAlreadyInstalledError,

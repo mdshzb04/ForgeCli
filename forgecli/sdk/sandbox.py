@@ -92,7 +92,7 @@ class ScopedBuiltins:
             }
         else:
             # Keep most things, but always drop the forbidden ones.
-            self._table = {name: value for name, value in vars(_builtins).items()}
+            self._table = dict(vars(_builtins))
         for name in _FORBIDDEN_BUILTIN_NAMES:
             self._table.pop(name, None)
 
