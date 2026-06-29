@@ -4,13 +4,20 @@ Assembles the final prompt (Ponytail-optimized system + user, plus
 Graphify retrieval as context) and dispatches it through the active
 provider. The selected provider is the one chosen by the router (see
 :mod:`forgecli.providers.router`).
+
+The stage supports a small retry loop: when ``context.extras`` carries
+a positive ``retries`` count, transient ``ProviderError`` exceptions
+are retried with a short backoff. Non-transient errors (e.g. the
+provider returns a 4xx) are surfaced immediately.
 """
 
 from __future__ import annotations
 
 import asyncio
+import logging
 
 from forgecli.build import BuildContext
+from forgecli.core.errors import ProviderError
 from forgecli.providers.base import (
     ChatMessage,
     ChatRequest,
@@ -33,6 +40,10 @@ _SYSTEM_PROMPT = (
     "no code fences. The diff must apply with `git apply`."
 )
 
+_TRANSIENT_HTTP_CODES = {408, 425, 429, 500, 502, 503, 504}
+_BACKOFF_SECONDS = 1.5
+_log = logging.getLogger("forgecli.build.llm")
+
 
 async def llm_call(context: BuildContext) -> BuildContext:
     """Send the assembled prompt to the active provider and store the response."""
@@ -40,6 +51,7 @@ async def llm_call(context: BuildContext) -> BuildContext:
     if provider is None:
         raise RuntimeError("no provider wired into the build context")
 
+    retries = int(context.extras.get("retries", 0) or 0)
     user_content = _format_user_prompt(context)
     base_request: ChatRequest = context.optimized_request or ChatRequest(
         messages=[ChatMessage(role=Role.USER, content=context.prompt)]
@@ -51,9 +63,36 @@ async def llm_call(context: BuildContext) -> BuildContext:
         }
     )
 
-    response: ChatResponse = await provider.chat(request)
-    context.response = response
-    return context
+    last_exc: Exception | None = None
+    for attempt in range(retries + 1):
+        try:
+            response: ChatResponse = await provider.chat(request)
+            context.response = response
+            return context
+        except ProviderError as exc:
+            last_exc = exc
+            if not _is_transient(exc) or attempt >= retries:
+                raise
+            wait = _BACKOFF_SECONDS * (attempt + 1)
+            _log.warning(
+                "transient provider error (attempt %d/%d): %s; retrying in %.1fs",
+                attempt + 1,
+                retries + 1,
+                exc,
+                wait,
+            )
+            await asyncio.sleep(wait)
+    # Unreachable, but keep mypy happy.
+    raise last_exc if last_exc else RuntimeError("llm_call: no attempts made")
+
+
+def _is_transient(exc: ProviderError) -> bool:
+    """Return True if ``exc`` looks like a transient HTTP failure."""
+    message = str(exc)
+    for code in _TRANSIENT_HTTP_CODES:
+        if f"({code})" in message:
+            return True
+    return False
 
 
 def _format_user_prompt(context: BuildContext) -> str:

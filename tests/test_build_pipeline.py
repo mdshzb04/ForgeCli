@@ -332,6 +332,53 @@ def test_default_pipeline_runs_end_to_end(tmp_path: Path) -> None:
     assert result.context.summary
 
 
+def test_llm_stage_retries_on_transient_failure(tmp_path: Path) -> None:
+    from forgecli.build.llm import llm_call
+    from forgecli.core.errors import ProviderError
+
+    class _FlakyProvider:
+        name = "flaky"
+        calls = 0
+
+        async def chat(self, request: ChatRequest) -> ChatResponse:
+            self.calls += 1
+            if self.calls < 3:
+                raise ProviderError(f"openai chat failed ({503})")
+            return ChatResponse(
+                model="m",
+                message=ChatMessage(role=Role.ASSISTANT, content="diff --git a/x b/x\n"),
+            )
+
+    provider = _FlakyProvider()
+    context = BuildContext(prompt="x", root=tmp_path)
+    context.extras["provider"] = provider
+    context.extras["retries"] = 3
+    out = asyncio.run(llm_call(context))
+    assert out.response is not None
+    assert provider.calls == 3
+
+
+def test_llm_stage_does_not_retry_on_permanent_failure(tmp_path: Path) -> None:
+    from forgecli.build.llm import llm_call
+    from forgecli.core.errors import ProviderError
+
+    class _BadProvider:
+        name = "bad"
+        calls = 0
+
+        async def chat(self, request: ChatRequest) -> ChatResponse:
+            self.calls += 1
+            raise ProviderError("openai chat failed (401): unauthorized")
+
+    provider = _BadProvider()
+    context = BuildContext(prompt="x", root=tmp_path)
+    context.extras["provider"] = provider
+    context.extras["retries"] = 5
+    with pytest.raises(ProviderError, match="401"):
+        asyncio.run(llm_call(context))
+    assert provider.calls == 1
+
+
 def test_pipeline_short_circuits_on_stage_failure(tmp_path: Path) -> None:
     provider = MockProvider(MockProviderConfig())
 
