@@ -397,6 +397,46 @@ the release notes to the path of your choice.
 
 ---
 
+## Plugin extension points
+
+ForgeCLI is designed to be extended. A plugin is a Python package
+that contributes one or more of the following:
+
+* a `Workflow` — a named, executable unit that orchestrates the
+  standard pipeline stages. The top-level `forge` command
+  dispatches to a `Workflow` based on the prompt's intent.
+* a `Provider` — an AI provider registered with the router.
+* a `PromptOptimizer` — a prompt-rewriting strategy picked by the
+  Ponytail intensity.
+* an `Analyzer` — a code-review analyzer run by `forge review`.
+* an `IntentClassifier` — a smarter intent classifier that runs
+  before the built-in heuristic one.
+
+A plugin is discovered via the `forgecli.plugins` entry-point
+group; the registered factory is called once at startup with the
+shared `PluginRegistry`, and the plugin can wire up whatever it
+needs (commands, providers, workflows, etc.).
+
+```toml
+# pyproject.toml of a ForgeCLI plugin
+[project.entry-points."forgecli.plugins"]
+my_plugin = "my_plugin:register"
+```
+
+```python
+# my_plugin/__init__.py
+def register(registry):
+    from forgecli.plugins import Workflow, Intent
+    from my_plugin.workflows import MyWorkflow
+
+    registry.register_workflow(MyWorkflow())
+```
+
+The top-level `forge --prompt` then dispatches to the registered
+`Workflow` whenever the intent matches.
+
+---
+
 ## Architecture notes
 
 - **Composition root**: `forgecli/cli/bootstrap.py` builds the
