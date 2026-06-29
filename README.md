@@ -104,6 +104,7 @@ Environment variables are documented in [`.env.example`](.env.example).
 | `forge optimizer preview`  | Show what would be prepended to a system message          |
 | `forge explain X`          | Top-level alias for `forge graph explain X`              |
 | `forge plan <goal>`        | Build a software plan (architecture, milestones, tasks, risks, prompts) |
+| `forge review`             | Run a code-quality review (security, performance, architecture, complexity, dead code, duplicates) |
 | `forge commit`             | Analyze the git diff, generate a semantic commit + changelog entry, optional push |
 | `forge build`              | Run the builder pipeline                                 |
 | `forge review`             | Review code changes                                      |
@@ -267,6 +268,55 @@ no real provider has credentials, the router falls back to the
 `mock` provider and the CLI prints a warning. The selection persists
 to `data_dir/router.json` and is read on every subsequent CLI
 invocation.
+
+---
+
+## Repository review
+
+`forge review` runs six AST + regex-based analyzers against a project
+and produces a Rich, JSON, or Markdown report. It runs locally and
+has no external dependencies.
+
+```bash
+# Default: print a Rich report to the terminal.
+forge review
+
+# Filter by category, severity, or both.
+forge review --only security,performance --severity high
+forge review --exclude dead-code,duplicates
+
+# Save the report.
+forge review --md --save review.md
+forge review --json --save report.json
+
+# Exit non-zero when critical findings are present (CI gate).
+forge review --fail-on-critical
+
+# List the available categories.
+forge review categories
+```
+
+What the analyzers catch:
+
+* **security** — hard-coded AWS keys, API tokens, PEM private keys,
+  `pickle.load`, `eval`/`exec`, `subprocess(shell=True)`, weak hashes
+  (`md5`/`sha1`), `assert` statements.
+* **performance** — blocking I/O (`open`, `read_text`) inside
+  `async def`, `time.sleep` in async code, deeply nested loops.
+* **architecture** — layer dependency direction (e.g. `core` cannot
+  import `graph`), circular imports between layers, configurable
+  forbidden imports.
+* **complexity** — function line count, parameter count, and an
+  approximate cyclomatic complexity (per function).
+* **dead-code** — private symbols (`_foo`) that are never referenced
+  anywhere in the project; ignores dunders, `__all__` re-exports, and
+  test files.
+* **duplicates** — near-duplicate 6-line blocks across files, using a
+  rolling token shingle. Output is capped at 50 findings per scan.
+
+The output is grouped by category, ranked by severity, and capped
+per scan so the report stays small. Use `forge review --json` to
+pipe the report into CI dashboards.
 
 ---
 
