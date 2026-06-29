@@ -19,11 +19,9 @@ from pathlib import Path
 
 from forgecli.platform.core import (
     getenv,
-    is_linux,
     is_macos,
     is_windows,
 )
-
 
 # ---------------------------------------------------------------------------
 # Directory helpers
@@ -61,6 +59,9 @@ def config_dir() -> Path:
 
 def data_dir() -> Path:
     """Return the per-user data directory for ForgeCLI."""
+    override = _coerce_path("FORGECLI_DATA_DIR")
+    if override is not None:
+        return override
     if is_windows():
         base = Path(os.environ.get("LOCALAPPDATA") or (Path.home() / "AppData" / "Local"))
     elif is_macos():
@@ -154,7 +155,7 @@ class ProjectPaths:
     @classmethod
     def from_env(
         cls, *, cwd: Path | str | None = None
-    ) -> "ProjectPaths":
+    ) -> ProjectPaths:
         """Resolve the default project paths for the current user.
 
         Environment variables take precedence: ``FORGECLI_DATA_DIR``,

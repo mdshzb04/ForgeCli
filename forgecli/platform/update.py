@@ -22,7 +22,7 @@ from __future__ import annotations
 import json
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
 
@@ -31,7 +31,6 @@ import httpx
 from forgecli import __version__ as _current_version
 from forgecli.platform.core import getenv, is_windows
 from forgecli.platform.paths import data_dir, ensure_directory
-
 
 DEFAULT_PYPI_URL: Final[str] = "https://pypi.org/pypi/forgecli/json"
 DEFAULT_TTL_SECONDS: Final[int] = 86_400  # 24h
@@ -153,12 +152,12 @@ def check_for_update(
             response = client.get(_pypi_url())
             response.raise_for_status()
             payload = response.json()
-    except Exception as exc:  # noqa: BLE001 - any failure means "no update info"
+    except Exception as exc:
         return UpdateInfo(
             current=current_version(),
             latest=None,
             update_available=False,
-            checked_at=datetime.now(timezone.utc),
+            checked_at=datetime.now(UTC),
             error=repr(exc),
         )
 
@@ -176,7 +175,7 @@ def _build_info(latest: str | None) -> UpdateInfo:
         current=current,
         latest=latest,
         update_available=update_available,
-        checked_at=datetime.now(timezone.utc),
+        checked_at=datetime.now(UTC),
     )
 
 

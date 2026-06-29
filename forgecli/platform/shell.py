@@ -66,7 +66,7 @@ def run(
     env: dict[str, str] | None = None,
     timeout: float | None = None,
     check: bool = False,
-    input: str | bytes | None = None,  # noqa: A002 - stdlib name
+    input: str | bytes | None = None,
 ) -> ShellResult:
     """Run a subprocess and return a :class:`ShellResult`.
 
@@ -97,7 +97,7 @@ def run(
         merged_env = os.environ.copy()
         merged_env.update({k: v for k, v in env.items() if v is not None})
 
-    completed = subprocess.run(  # noqa: S603
+    completed = subprocess.run(
         list(argv),
         cwd=str(cwd) if cwd is not None else None,
         env=merged_env,
@@ -122,7 +122,7 @@ async def run_capture(
     cwd: Path | str | None = None,
     env: dict[str, str] | None = None,
     timeout: float | None = None,
-    input: str | bytes | None = None,  # noqa: A002 - stdlib name
+    input: str | bytes | None = None,
 ) -> ShellResult:
     """Async wrapper around :func:`run`."""
     argv: tuple[str, ...]
@@ -157,7 +157,7 @@ async def run_capture(
         else:
             stdin_data = input.encode("utf-8") if isinstance(input, str) else input
             stdout_b, stderr_b = await process.communicate(stdin_data)
-    except asyncio.TimeoutError as exc:
+    except TimeoutError as exc:
         process.kill()
         raise TimeoutError(f"subprocess timed out after {timeout}s") from exc
     return ShellResult(

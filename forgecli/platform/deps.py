@@ -33,8 +33,6 @@ from typing import Final
 from forgecli.platform.core import (
     OS,
     current_platform,
-    is_linux,
-    is_macos,
     is_windows,
     python_version,
 )
@@ -160,7 +158,7 @@ def _run_version(executable: str, args: tuple[str, ...] = ("--version",)) -> str
     if path is None:
         return None
     try:
-        completed = __import__("subprocess").run(  # noqa: S603
+        completed = __import__("subprocess").run(
             [path, *args],
             capture_output=True,
             text=True,
@@ -183,28 +181,35 @@ def check_dependencies() -> DependencyReport:
     """Return a structured :class:`DependencyReport` for the current host."""
     deps: list[Dependency] = []
 
-    deps.append(_probe_required("git", has_git, _run_version))
-    deps.append(_probe_optional("python", has_python, lambda: python_version()))
-    deps.append(_probe_optional("graphify", has_graphify, lambda: _run_version("graphify")))
-    deps.append(_probe_optional("ponytail", has_ponytail, lambda: _run_version("ponytail")))
-    deps.append(_probe_optional("node", has_node, lambda: _run_version("node")))
-    deps.append(_probe_optional("pip", has_pip, lambda: _run_version("pip")))
-    deps.append(_probe_optional("uv", has_uv, lambda: _run_version("uv")))
+    deps.append(_probe_required("git", has_git, _version_for("git")))
+    deps.append(_probe_required("python", has_python, lambda: python_version()))
+    deps.append(_probe_optional("graphify", has_graphify, _version_for("graphify")))
+    deps.append(_probe_optional("ponytail", has_ponytail, _version_for("ponytail")))
+    deps.append(_probe_optional("node", has_node, _version_for("node")))
+    deps.append(_probe_optional("pip", has_pip, _version_for("pip")))
+    deps.append(_probe_optional("uv", has_uv, _version_for("uv")))
 
     # Package managers (platform-specific).
     if is_windows():
-        deps.append(_probe_optional("scoop", has_scoop, lambda: _run_version("scoop")))
-        deps.append(_probe_optional("winget", has_winget, lambda: _run_version("winget")))
+        deps.append(_probe_optional("scoop", has_scoop, _version_for("scoop")))
+        deps.append(_probe_optional("winget", has_winget, _version_for("winget")))
     else:
-        deps.append(_probe_optional("brew", has_homebrew, lambda: _run_version("brew")))
+        deps.append(_probe_optional("brew", has_homebrew, _version_for("brew")))
 
     return DependencyReport(dependencies=tuple(deps))
 
 
+def _version_for(executable: str):
+    """Return a zero-arg callable that fetches the version of ``executable``."""
+    def _callable() -> str | None:
+        return _run_version(executable)
+    return _callable
+
+
 def _probe_required(
     name: str,
-    has: "callable",
-    version: "callable",
+    has: callable,
+    version: callable,
     *,
     note: str | None = None,
 ) -> Dependency:
@@ -227,8 +232,8 @@ def _probe_required(
 
 def _probe_optional(
     name: str,
-    has: "callable",
-    version: "callable",
+    has: callable,
+    version: callable,
     *,
     note: str | None = None,
 ) -> Dependency:
@@ -320,8 +325,8 @@ __all__ = [
     "has_graphify",
     "has_homebrew",
     "has_node",
-    "has_ponytail",
     "has_pip",
+    "has_ponytail",
     "has_python",
     "has_scoop",
     "has_uv",

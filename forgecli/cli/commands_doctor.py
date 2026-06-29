@@ -21,7 +21,6 @@ from forgecli.cli.ui import (
     info,
     success,
     table,
-    warn,
 )
 from forgecli.platform import (
     ProjectPaths,
@@ -32,7 +31,6 @@ from forgecli.platform import (
     python_version,
 )
 from forgecli.platform.deps import DependencyStatus
-
 
 app = typer.Typer(
     help="Diagnose the current host (OS, dependencies, configuration).",

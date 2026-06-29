@@ -88,7 +88,7 @@ def _build_platform() -> Platform:
             release = _platform.mac_ver()[0] or _platform.release()
         else:
             release = _platform.release()
-    except Exception:  # noqa: BLE001 - any failure falls back to ""
+    except Exception:
         release = ""
 
     is_wsl = False
@@ -107,6 +107,12 @@ def _build_platform() -> Platform:
         python=_platform.python_version(),
         is_wsl=is_wsl,
     )
+
+
+# A single cached snapshot taken at import time. Cheap; safe to use
+# in tight loops. The call below is intentionally *after* the function
+# definition so the module body executes top-to-bottom.
+_PLATFORM: Final[Platform] = _build_platform()
 
 
 def detect_os() -> OS:
