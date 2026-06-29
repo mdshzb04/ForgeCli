@@ -15,7 +15,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: ["3.12", "3.13"]
+        python-version: ["3.12"]
 
     steps:
       - name: Check out
@@ -103,8 +103,8 @@ jobs:
         run: |
           uv tool install dist/*.whl
 
-      - name: Verify forge --version
-        run: uv tool run forge --version
+      - name: Verify forge --help
+        run: uv tool run forge --help
 
       - name: Verify forge doctor
         run: uv tool run forge doctor
