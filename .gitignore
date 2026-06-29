@@ -12,6 +12,9 @@ dist/
 *.egg-info/
 *.egg
 
+# But the in-tree `forgecli/build/` package is part of our source.
+!forgecli/build/
+
 # Virtual environments
 .venv/
 venv/
