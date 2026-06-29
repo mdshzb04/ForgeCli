@@ -13,8 +13,10 @@ from forgecli.cli import (
     commands_build,
     commands_commit,
     commands_config,
+    commands_doctor,
     commands_docs,
     commands_explain,
+    commands_forge,
     commands_git,
     commands_graph,
     commands_history,
@@ -57,12 +59,34 @@ app.add_typer(commands_release.app, name="release")
 app.add_typer(commands_git.app, name="git")
 app.add_typer(commands_history.app, name="history")
 app.add_typer(commands_explain.app, name="explain")
+app.add_typer(commands_doctor.app, name="doctor")
 
 
 def _version_callback(value: bool) -> None:
     if value:
         get_console().print(f"{__app_name__} [muted]v{__version__}[/muted]")
         raise typer.Exit()
+
+
+def _check_update_callback(value: bool) -> None:
+    """Query PyPI for the latest version and print a single line."""
+    if not value:
+        return
+    from forgecli.platform import check_for_update, upgrade_command
+
+    info = check_for_update()
+    if info.error and info.latest is None:
+        warn(f"could not check for updates: {info.error}")
+    elif info.update_available:
+        warn(
+            f"update available: {info.current} -> {info.latest}\n"
+            f"  upgrade with: {upgrade_command()}"
+        )
+    elif info.latest:
+        get_console().print(f"{__app_name__} [muted]v{__version__} (up to date)[/muted]")
+    else:
+        get_console().print(f"{__app_name__} [muted]v{__version__}[/muted]")
+    raise typer.Exit()
 
 
 # Top-level `forge --prompt "<request>"` callback: dispatches to the
@@ -103,6 +127,13 @@ def main(
         callback=_version_callback,
         is_eager=True,
         help="Show the version and exit.",
+    ),
+    check_update: bool = typer.Option(
+        False,
+        "--check-update",
+        callback=_check_update_callback,
+        is_eager=True,
+        help="Check PyPI for a newer version and exit.",
     ),
 ) -> None:
     """ForgeCLI global entry point.
