@@ -389,8 +389,13 @@ def _compose_summary(
     if len(files) == 1:
         file = files[0]
         name = Path(file.path).name or file.path
-        suffix = "" if file.kind is FileKind.SOURCE else f" ({file.kind.value})"
-        return _format_summary(verb, scope, name + suffix)
+        # When the file is a source file the kind is implicit in its
+        # location; drop the redundant ``(docs)``/``(test)`` suffix to
+        # keep the subject tight.
+        if file.kind is FileKind.SOURCE:
+            return _format_summary(verb, scope, name)
+        label = _OBJECT_SINGULAR[file.kind]
+        return _format_summary(verb, scope, f"{name} ({label})")
     counts = Counter(change.kind for change in files)
     most_common_kind, most_common_count = counts.most_common(1)[0]
     label = _OBJECT_SINGULAR[most_common_kind]
