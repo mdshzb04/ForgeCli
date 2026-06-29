@@ -41,7 +41,7 @@ class LoadedPlugin:
     """The result of loading a single plugin from disk or PyPI."""
 
     manifest: PluginManifest
-    entry_point_factories: dict[tuple[str, str], Callable[[PluginManager], None]]
+    entry_point_factories: dict
     """Map of (kind, name) -> configure(manager) callable.
 
     Each callable is invoked when the plugin is enabled; the
@@ -178,9 +178,9 @@ def _load_entry_point_distribution(
 
 def _load_entry_point_factories(
     manifest: PluginManifest, plugin_dir: Path
-) -> "dict[tuple[str, str], Callable[[PluginManager], None]":
+) -> dict:
     """Import each ``module:attr`` reference declared in the manifest."""
-    factories: "dict[tuple[str, str], Callable[[PluginManager], None]" = {}
+    factories: dict = {}
     for ep in manifest.entry_points:
         module_name, _, attr = ep.reference.partition(":")
         if not module_name or not attr:

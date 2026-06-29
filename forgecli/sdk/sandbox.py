@@ -41,8 +41,6 @@ _ALLOWED_BUILTIN_NAMES: frozenset[str] = frozenset(
         "pow", "divmod", "all", "any", "sorted",
         # Printing / I/O (controlled)
         "print", "open", "input",
-        # Common utilities
-        "max",
         # Exceptions
         "BaseException", "Exception", "ValueError", "TypeError",
         "KeyError", "IndexError", "StopIteration", "RuntimeError",
