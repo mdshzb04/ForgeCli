@@ -640,6 +640,12 @@ Python 3.12 and 3.13. See :file:`.github/workflows/ci.yml`.
 
 ---
 
+
+<img width="1854" height="1005" alt="image" src="https://github.com/user-attachments/assets/03f3c2e2-424c-4784-8a59-b2b0f4b99447" />
+
+<img width="1854" height="1005" alt="image" src="https://github.com/user-attachments/assets/6eb06d10-6f1f-4648-b679-028368362c24" />
+
+
 ## License
 
 [MIT](LICENSE)
