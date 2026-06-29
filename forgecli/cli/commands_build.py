@@ -72,6 +72,11 @@ def build_cmd(
         "--no-ponytail",
         help="Skip the Ponytail prompt-optimizer stage.",
     ),
+    retries: int = typer.Option(
+        0,
+        "--retries",
+        help="Retry the LLM stage up to N times on transient failures.",
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
     save_diff: Path | None = typer.Option(
         None,
@@ -92,6 +97,7 @@ def build_cmd(
             no_tests=no_tests,
             no_graph=no_graph,
             no_ponytail=no_ponytail,
+            retries=retries,
             json_output=json_output,
             save_diff=save_diff,
         )
@@ -107,6 +113,7 @@ async def _run_build(
     no_tests: bool,
     no_graph: bool,
     no_ponytail: bool,
+    retries: int,
     json_output: bool,
     save_diff: Path | None,
 ) -> None:
@@ -162,6 +169,8 @@ async def _run_build(
         graph=graph,
         test_command=None if no_tests else test_command,
     )
+    if retries:
+        build_context.extras["retries"] = retries
 
     result: BuildResult = await pipeline.run(build_context)
 
