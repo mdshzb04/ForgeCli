@@ -18,8 +18,10 @@ if one raises (failures are logged and isolated).
 
 from __future__ import annotations
 
+from __future__ import annotations
+
 import asyncio
-import logging
+import contextlib
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -193,6 +195,22 @@ def _suppress(*exceptions: type[BaseException]):
         yield
     except exceptions:
         pass
+
+
+def _discard_task(task: asyncio.Task) -> None:
+    """Keep a strong reference to a scheduled task until it completes."""
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+@contextlib.contextmanager
+def _suppress(*exceptions: type[BaseException]):
+    with contextlib.suppress(*exceptions):
+        yield
 
 
 def _discard_task(task: asyncio.Task) -> None:
