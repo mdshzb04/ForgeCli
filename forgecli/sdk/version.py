@@ -69,7 +69,7 @@ class Version:
                 if not match:
                     raise VersionParseError(f"invalid pre-release: {pre_str!r}")
                 ident, num = match.groups()
-                pre_tuple = pre_tuple + ((ident, int(num) if num else -1),)
+                pre_tuple = (*pre_tuple, (ident, int(num) if num else -1))
         return cls(
             major=int(major),
             minor=int(minor or 0),
