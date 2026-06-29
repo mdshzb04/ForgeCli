@@ -67,6 +67,11 @@ def build_cmd(
     ),
     no_tests: bool = typer.Option(False, "--no-tests", help="Skip the test stage."),
     no_graph: bool = typer.Option(False, "--no-graph", help="Skip Graphify retrieval."),
+    no_ponytail: bool = typer.Option(
+        False,
+        "--no-ponytail",
+        help="Skip the Ponytail prompt-optimizer stage.",
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
     save_diff: Path | None = typer.Option(
         None,
@@ -86,6 +91,7 @@ def build_cmd(
             test_command=test_command,
             no_tests=no_tests,
             no_graph=no_graph,
+            no_ponytail=no_ponytail,
             json_output=json_output,
             save_diff=save_diff,
         )
@@ -100,6 +106,7 @@ async def _run_build(
     test_command: str | None,
     no_tests: bool,
     no_graph: bool,
+    no_ponytail: bool,
     json_output: bool,
     save_diff: Path | None,
 ) -> None:
@@ -128,7 +135,9 @@ async def _run_build(
             error(f"Could not build provider: {exc}")
             raise typer.Exit(code=1) from exc
     optimizer: PromptOptimizer | None = (
-        context.container.resolve(PromptOptimizer)
+        None
+        if no_ponytail
+        else context.container.resolve(PromptOptimizer)
         if context.container.has(PromptOptimizer)
         else None
     )
