@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Generic, TypeVar
+from typing import Any, ClassVar, Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -114,7 +114,7 @@ class Provider(ABC, Generic[TConfig]):
     ``TConfig`` type and implement the abstract methods below.
     """
 
-    name: str = "abstract"
+    name: ClassVar[str] = "abstract"
 
     def __init__(self, config: TConfig) -> None:
         self._config = config
@@ -180,6 +180,12 @@ class ProviderRegistry:
         if cls is None:
             raise ProviderError(f"Unknown provider: {name!r}")
         return cls(config)
+
+    def get(self, name: str) -> type[Provider[Any]]:
+        cls = self._providers.get(name)
+        if cls is None:
+            raise ProviderError(f"Unknown provider: {name!r}")
+        return cls
 
     def names(self) -> list[str]:
         return sorted(self._providers)

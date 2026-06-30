@@ -99,6 +99,12 @@ app.command(
     context_settings={"allow_interspersed_args": True},
 )(commands_explain.main)
 
+app.command(
+    "optimize",
+    help="Optimize a prompt or request using the Ponytail optimizer.",
+    context_settings={"allow_interspersed_args": True},
+)(commands_optimizer.preview_cmd)
+
 app.add_typer(commands_doctor.app, name="doctor")
 app.add_typer(commands_plugin.app, name="plugin")
 app.add_typer(commands_status.app, name="status")

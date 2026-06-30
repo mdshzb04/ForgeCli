@@ -21,6 +21,7 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Version parsing
@@ -153,7 +154,7 @@ class Requirement:
     """A full requirement: name + set of version specs + optional extras."""
 
     name: str
-    specs: tuple[Spec, ...] = ()
+    specs: tuple[Any, ...] = ()
     extras: tuple[str, ...] = ()
 
     def matches(self, version: Version) -> bool:
@@ -165,8 +166,8 @@ class Requirement:
     def parse(cls, name: str, spec_string: str = "") -> Requirement:
         if not name:
             raise ValueError("requirement name must be non-empty")
-        specs: list[Spec] = []
-        extras: list[str] = []
+        specs: list[Any] = []
+        extras: tuple[str, ...] = ()
         body, sep, tail = spec_string.partition(_SPEC_SEP)
         if sep:
             extras_str = tail.strip()
@@ -208,7 +209,7 @@ class Requirement:
         return base
 
 
-def _tilde(version_str: str) -> Spec:
+def _tilde(version_str: str) -> Any:
     """Implement the ``~=X.Y`` and ``~=X.Y.Z`` operators."""
     parts = version_str.split(".")
     if len(parts) == 1:

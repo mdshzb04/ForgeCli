@@ -125,13 +125,14 @@ async def run_capture(
     input: str | bytes | None = None,
 ) -> ShellResult:
     """Async wrapper around :func:`run`."""
-    argv = (
-        ("cmd.exe", "/c", args)
-        if is_windows()
-        else (args,)
-        if isinstance(args, str)
-        else tuple(args)
-    )
+    argv: tuple[str, ...]
+    if isinstance(args, str):
+        if is_windows():
+            argv = ("cmd.exe", "/c", args)
+        else:
+            argv = (args,)
+    else:
+        argv = tuple(args)
 
     merged_env: dict[str, str] | None = None
     if env is not None:

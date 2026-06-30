@@ -136,7 +136,7 @@ def _tokenize_normalized(text: str) -> list[str]:
                 tokens.append("id")
             else:
                 tokens.append(token.string.strip())
-    except (tokenize.TokenizeError, IndentationError):
+    except (tokenize.TokenError, IndentationError):
         return tokens
     return [t for t in tokens if t]
 
@@ -161,5 +161,4 @@ def _hash(shingle: Iterable[str]) -> int:
 __all__ = ["DuplicatesAnalyzer"]
 
 
-# Silence unused-import warnings for symbols only used in some branches.
-_ = re
+# Silence unused-import warnings.

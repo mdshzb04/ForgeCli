@@ -118,7 +118,9 @@ def discover_entry_points() -> list[LoadedPlugin]:
     # multiple plugins in a single distribution.
     by_distribution: dict[str | None, list] = {}
     for ep in entries:
-        by_distribution.setdefault(ep.dist.name, []).append(ep)
+        dist = getattr(ep, "dist", None)
+        dist_name = dist.name if dist is not None else "unknown"
+        by_distribution.setdefault(dist_name, []).append(ep)
     for dist_name, ep_list in by_distribution.items():
         try:
             plugins.append(_load_entry_point_distribution(dist_name, ep_list))
@@ -230,9 +232,7 @@ def _parse_authors(value: str | None) -> list[str]:
     return [a.strip() for a in value.split(",") if a.strip()]
 
 
-# Silence the import-unused warning for ``ModuleSpec`` (kept for
-# future use when we want richer import diagnostics).
-_ = ModuleSpec
+# Silence unused-import warnings.
 
 __all__ = [
     "LoadedPlugin",

@@ -379,7 +379,7 @@ def build_software_plan(goal: str, options: PlannerOptions | None = None) -> Sof
 
 
 def _build_summary(goal: str, label: str, stack: Iterable[str]) -> str:
-    stack_list = ", ".join(stack[:4])
+    stack_list = ", ".join(list(stack)[:4])
     return (
         f"Plan for {label}: {goal}. "
         f"Suggested stack: {stack_list}. "
@@ -687,7 +687,7 @@ def _tasks_for_milestone(
             )
         return items
     if milestone.id == "M5":
-        items: list[tuple[str, str, tuple[str, ...], str, str]] = [
+        items = [
             (
                 "Write the README",
                 "Document install, quickstart, and architecture overview.",

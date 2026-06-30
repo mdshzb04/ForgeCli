@@ -13,6 +13,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from typing import ClassVar
+
 from forgecli.review.finding import Finding
 
 # Directories we never want to recurse into.
@@ -108,8 +110,8 @@ class AnalysisContext:
 class Analyzer(ABC):
     """Base class for review analyzers."""
 
-    name: str = "abstract"
-    category: str = "abstract"
+    name: ClassVar[str] = "abstract"
+    category: ClassVar[str] = "abstract"
 
     @abstractmethod
     def run(self, context: AnalysisContext) -> list[Finding]:

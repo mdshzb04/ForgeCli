@@ -32,6 +32,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Final
 
+from collections.abc import Callable
 from forgecli.platform.core import (
     OS,
     current_platform,
@@ -222,8 +223,8 @@ def _version_for(executable: str):
 
 def _probe_required(
     name: str,
-    has: callable,
-    version: callable,
+    has: Callable[[], bool],
+    version: Callable[[], str | None],
     *,
     note: str | None = None,
 ) -> Dependency:
@@ -246,8 +247,8 @@ def _probe_required(
 
 def _probe_optional(
     name: str,
-    has: callable,
-    version: callable,
+    has: Callable[[], bool],
+    version: Callable[[], str | None],
     *,
     note: str | None = None,
 ) -> Dependency:
@@ -306,7 +307,7 @@ _HINTS: Final[dict[str, dict[OS, tuple[str, ...]]]] = {
             "sudo pacman -S git            (Arch)",
             "sudo zypper install git       (openSUSE)",
         ),
-        OS.MACOS: ("xcode-select --install   (or:  brew install git)"),
+        OS.MACOS: ("xcode-select --install   (or:  brew install git)",),
         OS.WINDOWS: ("winget install Git.Git", "or:  scoop install git"),
         OS.OTHER: ("install Git from your package manager",),
     },
@@ -351,6 +352,4 @@ __all__ = [
 ]
 
 
-# Silence the unused-import warning for ``sys`` (kept for future
-# cross-platform probes).
-_ = sys
+# Silence unused-import warnings.

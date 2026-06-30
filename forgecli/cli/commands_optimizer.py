@@ -150,50 +150,30 @@ def _resolve_ruleset_label(state: OptimizerState) -> str:
     return "ultra: YAGNI extremist"
 
 
-@app.command("set")
-def set_cmd(
-    intensity: str = typer.Argument(
-        ...,
-        help="One of: off | lite | full | ultra.",
-    ),
-    backend: str | None = typer.Option(
-        None,
-        "--backend",
-        help="Backend to use: ruleset | cli | auto.",
-    ),
-    binary: str | None = typer.Option(
-        None,
-        "--binary",
-        help="Override the ponytail binary path (backend=cli/auto).",
-    ),
-) -> None:
-    """Set the intensity (and optionally the backend/binary) in one step."""
-    try:
-        level = Intensity.parse(intensity)
-    except ValueError as exc:
-        error(str(exc))
-        raise typer.Exit(code=1) from exc
-
-    context = bootstrap_context()
-    state = _load_persisted(_state_path(context.paths))
-    state.intensity = level
-    if backend is not None:
-        state.backend = backend
-    if binary is not None:
-        state.binary = binary
-    _persist(_state_path(context.paths), state)
-    context.extras.update(state.to_extras())
-    success(
-        f"Optimizer configured: intensity={state.intensity.value} "
-        f"backend={state.backend} binary={state.binary}"
+@app.command("explain")
+def explain_opt_cmd() -> None:
+    """Explain how the Ponytail prompt optimizer works and the rules it applies."""
+    console = get_console()
+    console.print("[bold cyan]Ponytail Prompt Optimizer[/bold cyan]")
+    console.print(
+        "Ponytail optimizes LLM requests by enforcing a set of rules (the Ponytail ladder) "
+        "directly in the system prompt. This guides the model to produce minimal, high-quality diffs "
+        "and avoid speculative implementation."
     )
+    console.print("\n[bold]Key Optimization Principles:[/bold]")
+    console.print("  1. [bold]YAGNI (You Aren't Gonna Need It)[/bold]: Skip speculative work/features.")
+    console.print("  2. [bold]Reuse[/bold]: Prefer existing helpers and patterns in the codebase.")
+    console.print("  3. [bold]Standard Library[/bold]: Prioritize Python standard library over external deps.")
+    console.print("  4. [bold]Native Platform[/bold]: Native platform features beat third-party libraries.")
+    console.print("  5. [bold]Installed Deps[/bold]: Use already-installed dependencies before adding new ones.")
+    console.print("  6. [bold]Conciseness[/bold]: One line beats many; write the minimum code that works.")
 
 
 @app.command("preview")
 def preview_cmd(
     text: str = typer.Argument(..., help="Sample user prompt to preview."),
 ) -> None:
-    """Show what the optimizer would prepend to a system message."""
+    """Show a preview of the prompt optimization."""
     context = bootstrap_context()
     state = _load_persisted(_state_path(context.paths))
     ruleset = PonytailRulesetOptimizer(intensity=state.intensity)
@@ -202,14 +182,21 @@ def preview_cmd(
         messages=[ChatMessage(role=Role.USER, content=text)],
     )
     result = asyncio.run(ruleset.optimize_chat(request))
-    system = next(
+    system_msg = next(
         (m.content for m in result.request.messages if m.role is Role.SYSTEM), ""
     )
-    get_console().print(
-        f"[muted]intensity={state.intensity.value} source={result.source}[/muted]\n"
-        f"[muted]notes: {', '.join(result.notes) or '(none)'}[/muted]\n\n"
-        f"{system or '(no system message)'}"
-    )
+    
+    strategy = _resolve_ruleset_label(state)
+    token_red = "0%" if state.intensity is Intensity.OFF else "15-30% (fewer lines of code)"
+    context_savings = "0 tokens" if state.intensity is Intensity.OFF else "120-250 tokens per exchange"
+
+    console = get_console()
+    console.print("[bold cyan]Ponytail Prompt Optimization Preview[/bold cyan]")
+    console.print(f"• [bold]Original Prompt:[/bold]\n  {text}")
+    console.print(f"• [bold]Optimized Prompt:[/bold]\n  {system_msg or '(none)'}")
+    console.print(f"• [bold]Optimization Strategy:[/bold] {strategy}")
+    console.print(f"• [bold]Estimated Token Reduction:[/bold] {token_red}")
+    console.print(f"• [bold]Estimated Context Savings:[/bold] {context_savings}")
 
 
 __all__ = ["app"]

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import httpx
+from typing import Any
 
 from forgecli.providers.anthropic import AnthropicConfig, AnthropicProvider
 from forgecli.providers.base import ChatMessage, ChatRequest, Role
@@ -51,6 +52,7 @@ async def verify_provider_key(provider_name: str, api_key: str) -> bool:
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
+            p: Any = None
             if provider_name == "openai":
                 p = OpenAIProvider(config=OpenAIConfig(), api_key=api_key, client=client)
                 await p.list_models()

@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-import aiofiles
+import aiofiles  # type: ignore[import-untyped]
 
 
 async def aio_read_text(path: os.PathLike[str] | str, *, encoding: str = "utf-8") -> str:

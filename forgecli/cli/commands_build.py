@@ -158,7 +158,7 @@ async def _run_build(
     optimizer: PromptOptimizer | None = (
         None
         if no_ponytail
-        else context.container.resolve(PromptOptimizer)
+        else context.container.resolve(PromptOptimizer)  # type: ignore[type-abstract]
         if context.container.has(PromptOptimizer)
         else None
     )

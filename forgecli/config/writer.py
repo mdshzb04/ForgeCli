@@ -9,7 +9,7 @@ from typing import Any
 try:
     import tomllib  # py3.11+
 except ModuleNotFoundError:  # pragma: no cover
-    import tomli as tomllib  # type: ignore[no-redef]
+    import tomli as tomllib  # type: ignore[no-redef,import-not-found]
 
 
 def dump_toml(data: dict[str, Any]) -> str:

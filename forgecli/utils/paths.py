@@ -28,7 +28,7 @@ class ProjectPaths:
         """
         from platformdirs import PlatformDirs  # local import to keep deps light
 
-        dirs = PlatformDirs("forgecli", appauthor=False, version=False)
+        dirs = PlatformDirs("forgecli", appauthor=False, version=None)
         cwd_path = Path(cwd) if cwd is not None else Path.cwd()
         data_dir = Path(os.environ["FORGECLI_DATA_DIR"]) if os.environ.get("FORGECLI_DATA_DIR") else Path(dirs.user_data_dir)
         config_dir = Path(os.environ["FORGECLI_CONFIG_DIR"]) if os.environ.get("FORGECLI_CONFIG_DIR") else Path(dirs.user_config_dir)

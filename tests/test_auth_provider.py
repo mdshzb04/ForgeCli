@@ -106,17 +106,15 @@ def test_auth_verify_with_valid_key(monkeypatch) -> None:
         "forgecli.core.credentials.get_api_key",
         lambda provider: "sk-test-key",
     )
-    monkeypatch.setattr(
-        "forgecli.core.verification.verify_provider_key",
-        lambda provider, key: True,
-    )
-
     async def mock_verify(p, k):
         return True
+    monkeypatch.setattr(
+        "forgecli.core.verification.verify_provider_key",
+        mock_verify,
+    )
 
-    with patch("forgecli.cli.commands_auth.asyncio.run", return_value=True):
-        runner = CliRunner()
-        result = runner.invoke(app, ["auth", "verify"])
+    runner = CliRunner()
+    result = runner.invoke(app, ["auth", "verify"])
     assert result.exit_code == 0
 
 
@@ -129,6 +127,10 @@ def test_auth_login_with_provider_and_key(monkeypatch, tmp_path: Path) -> None:
         return True
 
     monkeypatch.setattr(
+        "forgecli.core.verification.verify_provider_key",
+        mock_verify,
+    )
+    monkeypatch.setattr(
         "forgecli.core.credentials.set_api_key",
         lambda p, k: saved.update({p: k}) or True,
     )
@@ -136,9 +138,8 @@ def test_auth_login_with_provider_and_key(monkeypatch, tmp_path: Path) -> None:
         "forgecli.config.writer.update_config",
         lambda **kw: None,
     )
-    with patch("forgecli.cli.commands_auth.asyncio.run", return_value=True):
-        runner = CliRunner()
-        result = runner.invoke(app, ["auth", "login", "--provider", "openai", "--key", "sk-testkey"])
+    runner = CliRunner()
+    result = runner.invoke(app, ["auth", "login", "--provider", "openai", "--key", "sk-testkey"])
     assert result.exit_code == 0
     assert "Connection successful" in result.output or "saved" in result.output.lower()
 
@@ -146,15 +147,20 @@ def test_auth_login_with_provider_and_key(monkeypatch, tmp_path: Path) -> None:
 def test_auth_login_invalid_key_then_exit(monkeypatch, tmp_path: Path) -> None:
     """If verify fails and user declines retry, exit code 1."""
     monkeypatch.chdir(tmp_path)
+    async def mock_verify(provider, key):
+        return False
+    monkeypatch.setattr(
+        "forgecli.core.verification.verify_provider_key",
+        mock_verify,
+    )
     monkeypatch.setattr("forgecli.config.writer.update_config", lambda **kw: None)
-    with patch("forgecli.cli.commands_auth.asyncio.run", return_value=False):
-        runner = CliRunner()
-        # Input 'n' to decline retry
-        result = runner.invoke(
-            app,
-            ["auth", "login", "--provider", "openai", "--key", "bad-key"],
-            input="n\n",
-        )
+    runner = CliRunner()
+    # Input 'n' to decline retry
+    result = runner.invoke(
+        app,
+        ["auth", "login", "--provider", "openai", "--key", "bad-key"],
+        input="n\n",
+    )
     assert result.exit_code != 0 or "failed" in result.output.lower()
 
 

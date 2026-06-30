@@ -86,8 +86,8 @@ class HookManager:
         for hook in self._before:
             try:
                 result = hook.callback()
-                if hasattr(result, "__await__"):
-                    await result  # type: ignore[func-returns-value]
+                if result is not None:
+                    await result
             except Exception as exc:
                 bus.publish(
                     TextLogEvent(
@@ -106,8 +106,8 @@ class HookManager:
         for hook in self._after:
             try:
                 value = hook.callback()
-                if hasattr(value, "__await__"):
-                    await value  # type: ignore[func-returns-value]
+                if value is not None:
+                    await value
             except Exception as exc:
                 bus.publish(
                     TextLogEvent(

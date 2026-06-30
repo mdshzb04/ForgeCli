@@ -77,12 +77,78 @@ def review_cmd(
         "--full",
         help="Display all findings without capping at Top 10.",
     ),
+    live: bool = typer.Option(
+        False,
+        "--live",
+        help="Use the real provider (default: mock).",
+    ),
 ) -> None:
     """Run the full repository review and print a report."""
     if ctx.invoked_subcommand is not None:
         return
 
-    review: RepositoryReview = review_repository(Path(path).resolve())
+    from forgecli.providers.base import Provider
+    from forgecli.providers.mock import MockProvider, MockProviderConfig
+
+    provider: Provider = MockProvider(MockProviderConfig())
+    if live:
+        from forgecli.cli.bootstrap import bootstrap_context
+        from forgecli.providers.base import ProviderRegistry
+        from forgecli.providers.router_state import load_state
+
+        app_context = bootstrap_context(cwd=str(path))
+        state = load_state(app_context.paths.data_dir / "router.json")
+        registry: ProviderRegistry = app_context.container.resolve(ProviderRegistry)
+
+        chosen = state.choice or state.provider
+        if not chosen:
+            from forgecli.config.loader import ConfigLoader
+            try:
+                settings = ConfigLoader().load()
+                chosen = settings.providers.default
+            except Exception:
+                pass
+        if not chosen:
+            raise ValueError(
+                "No active provider configured. Please authenticate first (e.g. 'forge auth login'), "
+                "then set your active provider using 'forge provider use <provider>' and active model using 'forge model use <model>'."
+            )
+
+        if not registry.has(chosen):
+            raise ValueError(f"Unknown provider '{chosen}'.")
+        provider_cls = registry.get(chosen)
+        provider = provider_cls()  # type: ignore[call-arg]
+
+    from forgecli.orchestrator import PluginRegistry, Orchestrator, ReviewWorkflow, HeuristicIntentClassifier
+    import asyncio
+
+    registry_obj = PluginRegistry()
+    registry_obj.register_classifier(HeuristicIntentClassifier())
+    registry_obj.register_workflow(ReviewWorkflow())
+    orchestrator = Orchestrator(registry_obj, provider=provider)
+
+    review: RepositoryReview | None = None
+    try:
+        if isinstance(provider, MockProvider):
+            raise ValueError("No live provider configured")
+
+        result = asyncio.run(orchestrator.run("review code quality"))
+        if not result.success:
+            raise Exception(result.error or "Orchestrator failed")
+
+        review = result.extras.get("review")
+        if not json_output and not md_output:
+            get_console().print()
+            get_console().print(result.summary)
+            get_console().print()
+    except Exception as exc:
+        if not json_output and not md_output:
+            warn(f"Live provider could not be used ({exc}). Falling back to static review scan.")
+        review = review_repository(Path(path).resolve())
+
+    if review is None:
+        review = review_repository(Path(path).resolve())
+
     review = _filter(review, severity=severity, only=only, exclude=exclude)
 
     if save is not None:

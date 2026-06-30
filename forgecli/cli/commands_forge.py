@@ -119,7 +119,7 @@ def _build_provider_for(*, live: bool, cwd: Path):
     if not registry.has(chosen):
         raise ValueError(f"Unknown provider '{chosen}'.")
     provider_cls = registry.get(chosen)
-    return provider_cls()
+    return provider_cls()  # type: ignore[call-arg]
 
 
 def _build_orchestrator_for(

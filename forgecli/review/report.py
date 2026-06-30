@@ -274,7 +274,7 @@ class TextRenderable:
     def __init__(self, text: str, style: str | None = None) -> None:
         from rich.text import Text
 
-        self._text = Text(text, style=style)
+        self._text = Text(text, style=style or "")
 
     def __rich_console__(self, console: Console, options):
         yield from console.render(self._text, options)

@@ -17,6 +17,12 @@ from forgecli.providers.router import (
 )
 
 
+
+@pytest.fixture(autouse=True)
+def mock_get_api_key(monkeypatch) -> None:
+    monkeypatch.setattr("forgecli.core.credentials.get_api_key", lambda name: None)
+
+
 def _registry_with_real_providers() -> ProviderRegistry:
     """Build a registry with mock + OpenAI + Anthropic + Gemini."""
     registry = ProviderRegistry()

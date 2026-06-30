@@ -122,7 +122,7 @@ class PerformanceAnalyzer(Analyzer):
                             "consider refactoring to reduce complexity."
                         ),
                         path=str(file.path),
-                        line=deepest.lineno,
+                        line=getattr(deepest, "lineno", 1),
                         suggestion=(
                             "Extract the inner loop into a helper, or "
                             "vectorize with itertools / numpy."

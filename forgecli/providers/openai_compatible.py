@@ -222,13 +222,13 @@ class LocalProvider(HTTPChatProvider):
                 models_list = data.get("data", [])
                 return [
                     ModelInfo(
-                        id=m.get("id"),
-                        name=m.get("id"),
+                        id=str(m["id"]),
+                        name=str(m.get("id")),
                         context_window=128_000,
                         supports_tools=True,
                         supports_vision=True
                     )
-                    for m in models_list if isinstance(m, dict) and "id" in m
+                    for m in models_list if isinstance(m, dict) and m.get("id") is not None
                 ]
         except Exception:
             pass

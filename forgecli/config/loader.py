@@ -8,7 +8,7 @@ from typing import Any
 try:
     import tomllib  # py3.11+
 except ModuleNotFoundError:  # pragma: no cover - fallback for older runtimes
-    import tomli as tomllib  # type: ignore[no-redef]
+    import tomli as tomllib  # type: ignore[no-redef,import-not-found]
 
 from forgecli.config.settings import ForgeSettings
 from forgecli.core.errors import ConfigError

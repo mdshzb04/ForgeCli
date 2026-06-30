@@ -73,12 +73,12 @@ async def _run_ask(question: str, path: Path, live: bool) -> None:
         if not registry.has(chosen):
             raise ValueError(f"Unknown provider '{chosen}'.")
         provider_cls = registry.get(chosen)
-        provider = provider_cls()
+        provider = provider_cls()  # type: ignore[call-arg]
 
-    registry = PluginRegistry()
-    registry.register_classifier(HeuristicIntentClassifier())
-    registry.register_workflow(AskWorkflow())
-    orchestrator = Orchestrator(registry, provider=provider)
+    plugin_registry = PluginRegistry()
+    plugin_registry.register_classifier(HeuristicIntentClassifier())
+    plugin_registry.register_workflow(AskWorkflow())
+    orchestrator = Orchestrator(plugin_registry, provider=provider)
 
     try:
         if isinstance(provider, MockProvider):

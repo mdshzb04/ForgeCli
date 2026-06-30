@@ -323,7 +323,4 @@ def _git_commit(message: str, project: Path, *, signoff: bool) -> str:
 __all__ = ["app"]
 
 
-# Silence unused-import warnings for symbols only used in some branches.
-_ = CommitKind
-_ = status_porcelain
-_ = asyncio
+# Silence unused-import warnings.

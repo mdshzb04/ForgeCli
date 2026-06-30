@@ -132,7 +132,7 @@ class PluginRegistry:
     analyzers: list[type[Analyzer]] = field(default_factory=list)
     classifiers: list[IntentClassifier] = field(default_factory=list)
     workflows: list[Workflow] = field(default_factory=list)
-    stages: dict[str, object] = field(default_factory=dict)  # type: ignore[type-arg]
+    stages: dict[str, Any] = field(default_factory=dict)
     configure_hooks: list[Callable[[AppContext], None]] = field(default_factory=list)
     engine_registry: StageRegistry | None = None  # StageRegistry, kept loose to avoid import cycles
 

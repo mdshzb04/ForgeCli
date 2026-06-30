@@ -84,6 +84,10 @@ class PromptOptimizer(ABC):
     ) -> OptimizedRequest:
         """Return an optimized copy of ``request``."""
 
+    async def is_available(self) -> bool:
+        """Return whether this optimizer is available to use."""
+        return True
+
 
 class CompositeOptimizer(PromptOptimizer):
     """Pick the right optimizer for the configured :class:`Intensity`."""

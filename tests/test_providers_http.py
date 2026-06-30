@@ -94,7 +94,9 @@ async def test_openai_chat_raises_on_http_error() -> None:
 
 
 @pytest.mark.asyncio
-async def test_openai_validate_raises_without_key() -> None:
+async def test_openai_validate_raises_without_key(monkeypatch) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr("forgecli.core.credentials.get_api_key", lambda name: None)
     provider = OpenAIProvider(config=OpenAIConfig(), api_key=None, client=_client())
     with pytest.raises(ProviderError, match="OPENAI_API_KEY"):
         provider.validate()

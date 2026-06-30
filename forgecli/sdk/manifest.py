@@ -144,7 +144,7 @@ class PluginManifest:
     def dump(self) -> str:
         """Serialise the manifest as TOML."""
         try:
-            import tomli_w  # type: ignore[import-untyped]
+            import tomli_w  # type: ignore[import-not-found,import-untyped]
 
             return tomli_w.dumps(self._to_dict())
         except ImportError:

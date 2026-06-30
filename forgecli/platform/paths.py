@@ -235,6 +235,4 @@ __all__ = [
 ]
 
 
-# Silence the unused-import warning for the common helper.
-_ = Iterable
-_ = getenv
+# Silence unused-import warnings.

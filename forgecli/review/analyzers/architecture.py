@@ -92,7 +92,7 @@ class ArchitectureAnalyzer(Analyzer):
                             f"'{target_layer}' ({imported})."
                         ),
                         path=str(file.path),
-                        line=node.lineno,
+                        line=getattr(node, "lineno", 1),
                         suggestion=(
                             "Move the dependency, or invert the call so the "
                             "lower layer exposes a callback."
@@ -119,6 +119,8 @@ class ArchitectureAnalyzer(Analyzer):
                 continue
             for node in ast.walk(tree):
                 imported = _imported_module(node)
+                if imported is None:
+                    continue
                 target = _layer_of(imported, {layer: idx for idx, layer in enumerate(self.layers)})
                 if target is None or target == layer:
                     continue
@@ -168,7 +170,7 @@ class ArchitectureAnalyzer(Analyzer):
                                     f"allowed in this project."
                                 ),
                                 path=str(file.path),
-                                line=node.lineno,
+                                line=getattr(node, "lineno", 1),
                                 suggestion=(
                                     "Use the public API exposed by the "
                                     "intended module."
@@ -253,5 +255,4 @@ def _find_cycles(graph: dict[str, set[str]]) -> list[list[str]]:
 __all__ = ["ArchitectureAnalyzer"]
 
 
-# Silence unused-import warnings for symbols only used in some branches.
-_ = field
+# Silence unused-import warnings.

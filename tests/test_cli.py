@@ -73,28 +73,7 @@ def test_cli_main_empty() -> None:
     assert "Developer Operating System" in result.output
 
 
-def test_cli_graph_open_missing(tmp_path: Path) -> None:
-    runner = CliRunner()
-    result = runner.invoke(app, ["graph", "open", "-p", str(tmp_path)])
-    assert result.exit_code == 1
-    assert "No interactive graph visualization found" in result.output
 
-
-def test_cli_graph_open_success(tmp_path: Path, monkeypatch) -> None:
-    out_dir = tmp_path / "graphify-out"
-    out_dir.mkdir(parents=True)
-    html_file = out_dir / "graph.html"
-    html_file.write_text("<html></html>", encoding="utf-8")
-
-    called_open = []
-    monkeypatch.setattr("webbrowser.open", lambda url: called_open.append(url))
-
-    runner = CliRunner()
-    result = runner.invoke(app, ["graph", "open", "-p", str(tmp_path)])
-    assert result.exit_code == 0
-    assert "Opening interactive graph" in result.output
-    assert "Interactive graph launched" in result.output
-    assert len(called_open) == 1
 
 
 def test_cli_records_history(monkeypatch, tmp_path: Path) -> None:

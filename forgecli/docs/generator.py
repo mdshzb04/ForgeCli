@@ -52,7 +52,7 @@ def generate_docs(context: AppContext, *, output: Path | None = None) -> Path:
     lines.append("## Modules\n")
     for community, members in sorted(communities.items()):
         lines.append(f"### {community}\n")
-        for node in sorted(members, key=lambda n: n["path"]):
+        for node in sorted(members, key=lambda n: str(n["path"])):
             location = (
                 f"`{node['path']}:{node['line']}`"
                 if node["line"]

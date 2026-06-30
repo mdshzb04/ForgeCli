@@ -169,6 +169,7 @@ class BuildWorkflow(Workflow):
         decision = self._resolve_decision(app_context)
 
         build_context = BuildContext(prompt=context.prompt, root=target, decision=decision)
+        build_context.extras.update(context.extras.get("build_extras", {}))
         build_context.extras["provider"] = self._provider
         if self._graphify is not None:
             build_context.extras["graph"] = self._graphify
@@ -316,11 +317,33 @@ class Orchestrator:
         try:
             prediction = self._classify(prompt)
             workflow = self._workflow_for(prediction)
+            
+            app_ctx = _bootstrap_app_context()
+            from forgecli.optimizer.ponytail import PromptOptimizer
+            from forgecli.graph.repository import RepositoryGraph
+            
+            opt = None
+            if app_ctx.container.has(PromptOptimizer):
+                opt = app_ctx.container.resolve(PromptOptimizer)  # type: ignore[type-abstract]
+            
+            graph = None
+            if app_ctx.container.has(RepositoryGraph):
+                graph = app_ctx.container.resolve(RepositoryGraph)  # type: ignore[type-abstract]
+                
+            build_extras = {
+                "provider": self._provider,
+                "optimizer": opt,
+                "graph": graph,
+            }
+            
             plugin_context = PluginContext(
-                app_context=_bootstrap_app_context(),
+                app_context=app_ctx,
                 prompt=prompt,
                 intent=prediction.intent,
-                extras={"prediction": prediction},
+                extras={
+                    "prediction": prediction,
+                    "build_extras": build_extras,
+                },
             )
             payload = await workflow.run(plugin_context)
         except Exception:
@@ -440,12 +463,51 @@ class DocsWorkflow(Workflow):
     intents = (Intent.DOCS,)
 
     async def run(self, context: PluginContext) -> dict[str, Any]:
-        from forgecli.docs.generator import generate_docs
+        from forgecli.build import BuildContext, BuildPipeline
+        from forgecli.build.optimize import ponytail_optimization
+        from forgecli.build.llm import llm_call
+        from forgecli.build.summarize import summarize
 
-        output = generate_docs(context.app_context)
+        root = context.app_context.cwd
+        files_info = []
+        for path in sorted(root.rglob("*.py")):
+            if any(part.startswith(".") for part in path.parts):
+                continue
+            if any(part in {"__pycache__", "node_modules", ".venv", "venv"} for part in path.parts):
+                continue
+            files_info.append(str(path.relative_to(root)))
+        
+        prompt = (
+            f"Generate a comprehensive overview documentation for the project '{root.name}'.\n"
+            f"Here are the main files in the project:\n"
+            + "\n".join(f"- {f}" for f in files_info[:30]) + "\n\n"
+            f"Produce a clean, professional, and well-structured Markdown document containing:\n"
+            f"1. Executive Summary of the project purpose.\n"
+            f"2. High-level architecture overview.\n"
+            f"3. Key modules and entry points."
+        )
+
+        build_context = BuildContext(prompt=prompt, root=Path.cwd())
+        build_context.extras.update(context.extras.get("build_extras", {}))
+
+        pipeline = BuildPipeline(
+            [
+                ("ponytail-optimize", ponytail_optimization),
+                ("llm", llm_call),
+                ("summarize", summarize),
+            ]
+        )
+        result = await pipeline.run(build_context)
+        ai_docs = result.context.response.message.content if result.context.response else ""
+
+        output_dir = root / "docs"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        target = output_dir / "OVERVIEW.md"
+        target.write_text(ai_docs, encoding="utf-8")
+
         return {
-            "summary": f"Documentation written to {output}",
-            "files_touched": [output],
+            "summary": f"Documentation written to {target}",
+            "files_touched": [target],
             "diff": "",
         }
 
@@ -456,13 +518,40 @@ class ReviewWorkflow(Workflow):
 
     async def run(self, context: PluginContext) -> dict[str, Any]:
         from forgecli.review import review_repository
+        from forgecli.build import BuildContext, BuildPipeline
+        from forgecli.build.optimize import ponytail_optimization
+        from forgecli.build.llm import llm_call
+        from forgecli.build.summarize import summarize
 
         review = review_repository(Path.cwd())
+        
+        prompt = (
+            f"Review the code quality scan findings for the project:\n\n"
+            f"Findings: {len(review.findings)} total.\n"
+            f"Suggestions: {len(review.suggestions)} total.\n\n"
+            f"Summarize the findings and provide key quality improvement recommendations."
+        )
+        
+        build_context = BuildContext(prompt=prompt, root=Path.cwd())
+        build_context.extras.update(context.extras.get("build_extras", {}))
+        
+        pipeline = BuildPipeline(
+            [
+                ("ponytail-optimize", ponytail_optimization),
+                ("llm", llm_call),
+                ("summarize", summarize),
+            ]
+        )
+        result = await pipeline.run(build_context)
+        ai_summary = result.context.response.message.content if result.context.response else ""
+        
+        summary = (
+            f"Reviewed {review.stats.get('files', 0)} files; "
+            f"{len(review.findings)} findings.\n\n"
+            f"[bold]AI Summary & Recommendations:[/bold]\n{ai_summary}"
+        )
         return {
-            "summary": (
-                f"Reviewed {review.stats.get('files', 0)} files; "
-                f"{len(review.findings)} findings."
-            ),
+            "summary": summary,
             "review": review,
             "files_touched": [],
             "diff": "",
@@ -474,24 +563,27 @@ class ExplainWorkflow(Workflow):
     intents = (Intent.EXPLAIN,)
 
     async def run(self, context: PluginContext) -> dict[str, Any]:
-        from forgecli.graph.backend_graphify import GraphifyRepositoryGraph
-        from forgecli.graph.repository import GraphSnapshot
+        from forgecli.build import BuildContext, BuildPipeline
+        from forgecli.build.optimize import ponytail_optimization
+        from forgecli.build.llm import llm_call
+        from forgecli.build.retrieval import graphify_retrieval
+        from forgecli.build.summarize import summarize
 
-        graph = GraphifyRepositoryGraph(root=Path.cwd())
-        try:
-            snapshot: GraphSnapshot = await graph.load()
-        except Exception as exc:
-            return {"summary": f"Could not load graph: {exc}", "files_touched": [], "diff": ""}
-        matches = snapshot.search(context.prompt, limit=8)
-        lines = ["Top matches for your query:"]
-        for node in matches:
-            lines.append(f"- {node.label} ({node.source_file or '?'})")
-        return {
-            "summary": "\n".join(lines) or "No matches found.",
-            "matches": matches,
-            "files_touched": [],
-            "diff": "",
-        }
+        prompt = f"Explain the node, file, or symbol: {context.prompt}"
+        build_context = BuildContext(prompt=prompt, root=Path.cwd())
+        build_context.extras.update(context.extras.get("build_extras", {}))
+
+        pipeline = BuildPipeline(
+            [
+                ("graphify-retrieval", graphify_retrieval),
+                ("ponytail-optimize", ponytail_optimization),
+                ("llm", llm_call),
+                ("summarize", summarize),
+            ]
+        )
+        result = await pipeline.run(build_context)
+        explanation = result.context.response.message.content if result.context.response else ""
+        return {"summary": explanation, "files_touched": [], "diff": ""}
 
 
 class CommitWorkflow(Workflow):
@@ -536,8 +628,9 @@ def _bootstrap_app_context() -> AppContext:
     try:
         return bootstrap_context()
     except Exception:
+        from forgecli.config.loader import ConfigLoader
         paths = ProjectPaths.from_env().ensure()
-        return AppContext(paths=paths)
+        return AppContext(paths=paths, loader=ConfigLoader())
 
 
 __all__ = [

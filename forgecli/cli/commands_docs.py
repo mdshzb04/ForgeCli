@@ -2,13 +2,22 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 import typer
 
 from forgecli.cli.bootstrap import bootstrap_context
-from forgecli.cli.ui import error, get_console, success
+from forgecli.cli.ui import error, get_console, success, warn, info
 from forgecli.docs.generator import generate_docs
+from forgecli.orchestrator import (
+    DocsWorkflow,
+    HeuristicIntentClassifier,
+    Orchestrator,
+    PluginRegistry,
+)
+from forgecli.providers.mock import MockProvider, MockProviderConfig
+from forgecli.utils.paths import to_privacy_path
 
 app = typer.Typer(
     help="Auto-generate a project overview from the knowledge graph.",
@@ -24,18 +33,70 @@ def docs_cmd(
     output: Path | None = typer.Option(
         None, "--output", "-o", help="Override the output file (default: docs/OVERVIEW.md)."
     ),
+    live: bool = typer.Option(False, "--live", help="Use the real provider (default: mock)."),
 ) -> None:
     """Generate an overview of the current project."""
     if ctx.invoked_subcommand is not None:
         return
-    context = bootstrap_context(cwd=path)
+    asyncio.run(_run_docs(Path(path), output, live))
+
+
+async def _run_docs(path: Path, output: Path | None, live: bool) -> None:
+    from forgecli.providers.base import Provider
+
+    provider: Provider = MockProvider(MockProviderConfig())
+    if live:
+        from forgecli.providers.base import ProviderRegistry
+        from forgecli.providers.router_state import load_state
+
+        app_context = bootstrap_context(cwd=str(path))
+        state = load_state(app_context.paths.data_dir / "router.json")
+        registry: ProviderRegistry = app_context.container.resolve(ProviderRegistry)
+
+        chosen = state.choice or state.provider
+        if not chosen:
+            from forgecli.config.loader import ConfigLoader
+            try:
+                settings = ConfigLoader().load()
+                chosen = settings.providers.default
+            except Exception:
+                pass
+        if not chosen:
+            raise ValueError(
+                "No active provider configured. Please authenticate first (e.g. 'forge auth login'), "
+                "then set your active provider using 'forge provider use <provider>' and active model using 'forge model use <model>'."
+            )
+
+        if not registry.has(chosen):
+            raise ValueError(f"Unknown provider '{chosen}'.")
+        provider_cls = registry.get(chosen)
+        provider = provider_cls()  # type: ignore[call-arg]
+
+    plugin_registry = PluginRegistry()
+    plugin_registry.register_classifier(HeuristicIntentClassifier())
+    plugin_registry.register_workflow(DocsWorkflow())
+    orchestrator = Orchestrator(plugin_registry, provider=provider)
+
     try:
-        target = generate_docs(context, output=output)
+        if isinstance(provider, MockProvider):
+            raise ValueError("No live provider configured")
+
+        result = await orchestrator.run("generate documentation")
+        if not result.success:
+            raise Exception(result.error or "Orchestrator failed")
+
+        get_console().print()
+        get_console().print(result.summary or "(no summary)")
     except Exception as exc:
-        error(f"Failed to generate docs: {exc}")
-        raise typer.Exit(code=1) from exc
-    success(f"Documentation written to {target}")
-    get_console().print(f"  [muted]{target}[/muted]")
+        warn(f"Live provider could not be used ({exc}). Falling back to static documentation generator.")
+        try:
+            context = bootstrap_context(cwd=str(path))
+            target = generate_docs(context, output=output)
+            success(f"Documentation written to {target}")
+            get_console().print(f"  [muted]{target}[/muted]")
+        except Exception as e:
+            error(f"Failed to generate docs: {e}")
+            raise typer.Exit(code=1) from e
 
 
 __all__ = ["app"]

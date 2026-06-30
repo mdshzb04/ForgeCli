@@ -48,7 +48,7 @@ _SECRET_PATTERNS: tuple[tuple[str, str, re.Pattern[str]], ...] = (
 )
 
 
-_UNSAFE_CALLS: tuple[tuple[str, str, str], ...] = (
+_UNSAFE_CALLS: tuple[tuple[str | None, str, str], ...] = (
     # (qualified-prefix-or-None, attr-or-None, rule_id)
     # Module-qualified calls.
     ("os", "system", "SEC010"),

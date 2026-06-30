@@ -44,15 +44,16 @@ def list_cmd() -> None:
 
     from forgecli.config.loader import ConfigLoader
 
-    bootstrap_context()
+    context = bootstrap_context()
 
+    default_p: str | None = None
+    default_m: str | None = None
     try:
         settings = ConfigLoader().load()
         default_p = settings.providers.default
         default_m = settings.providers.default_model
     except Exception:
-        default_p = None
-        default_m = None
+        pass
 
     if default_p:
         active_p_disp = PROVIDER_DISPLAY_NAMES.get(default_p, default_p.capitalize())
@@ -97,29 +98,44 @@ def list_cmd() -> None:
         console.print(f"[{color}]{status_char}[/{color}] [bold]{p_name}[/bold]{default_suffix}")
 
         p_models = [m for m in MODEL_CATALOG if m.provider == p_id]
+        
+        dynamic_models = []
+        if p_id in ["ollama", "lmstudio", "vllm"]:
+            try:
+                import asyncio
+                registry = context.container.resolve(ProviderRegistry)
+                provider_cls = registry.get(p_id)
+                provider_inst = provider_cls()  # type: ignore[call-arg]
+                dynamic_models = asyncio.run(provider_inst.list_models())
+            except Exception:
+                pass
 
-        latest_group = [m for m in p_models if m.tier == "latest"]
-        rec_group = [m for m in p_models if m.tier == "recommended"]
-        normal_group = [m for m in p_models if m.tier == "normal"]
-        legacy_group = [m for m in p_models if m.tier == "legacy"]
-        deprecated_group = [m for m in p_models if m.tier == "deprecated"]
+        if dynamic_models:
+            for dm in dynamic_models:
+                console.print(f"  {dm.name}")
+        else:
+            latest_group = [m for m in p_models if m.tier == "latest"]
+            rec_group = [m for m in p_models if m.tier == "recommended"]
+            normal_group = [m for m in p_models if m.tier == "normal"]
+            legacy_group = [m for m in p_models if m.tier == "legacy"]
+            deprecated_group = [m for m in p_models if m.tier == "deprecated"]
 
-        for m in latest_group:
-            console.print(f"  ★ {m.display_name}")
-        for m in rec_group:
-            console.print(f"  ✓ {m.display_name}")
-        for m in normal_group:
-            console.print(f"  {m.display_name}")
+            for m in latest_group:
+                console.print(f"  ★ {m.display_name}")
+            for m in rec_group:
+                console.print(f"  ✓ {m.display_name}")
+            for m in normal_group:
+                console.print(f"  {m.display_name}")
 
-        if legacy_group:
-            console.print("  Legacy")
-            for m in legacy_group:
-                console.print(f"    {m.display_name}")
+            if legacy_group:
+                console.print("  Legacy")
+                for m in legacy_group:
+                    console.print(f"    {m.display_name}")
 
-        if deprecated_group:
-            console.print("  Deprecated")
-            for m in deprecated_group:
-                console.print(f"    {m.display_name}")
+            if deprecated_group:
+                console.print("  Deprecated")
+                for m in deprecated_group:
+                    console.print(f"    {m.display_name}")
 
         console.print("")
 
@@ -149,7 +165,7 @@ def use(
         from forgecli.config.loader import ConfigLoader
         try:
             settings = ConfigLoader().load()
-            found_provider = settings.providers.default
+            found_provider = settings.providers.default or "mock"
         except Exception:
             found_provider = "mock"
 
@@ -167,13 +183,14 @@ def current() -> None:
 
     context = bootstrap_context()
 
+    default_p: str | None = None
+    default_m: str | None = None
     try:
         settings = ConfigLoader().load()
         default_p = settings.providers.default
         default_m = settings.providers.default_model
     except Exception:
-        default_p = None
-        default_m = None
+        pass
 
     if not default_m or default_m == "auto":
         if default_p:

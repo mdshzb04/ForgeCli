@@ -28,10 +28,12 @@ log = get_logger(__name__)
 def bootstrap_context(
     *,
     config_path: Path | None = None,
-    cwd: Path | None = None,
+    cwd: Path | str | None = None,
     extras: dict[str, Any] | None = None,
 ) -> AppContext:
     """Build an :class:`AppContext` with default services registered."""
+    if isinstance(cwd, str):
+        cwd = Path(cwd)
     import click
     try:
         click_ctx = click.get_current_context(silent=True)
@@ -181,11 +183,11 @@ def _build_container(
         ),
     )
     container.register(
-        RepositoryGraph,
+        RepositoryGraph,  # type: ignore[type-abstract]
         lambda _c: GraphifyRepositoryGraph(root=paths.cwd),
     )
     container.register(
-        PromptOptimizer,
+        PromptOptimizer,  # type: ignore[type-abstract]
         lambda _c: build_optimizer(_load_optimizer_state(paths)),
     )
     container.register(

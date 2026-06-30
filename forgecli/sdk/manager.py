@@ -152,7 +152,7 @@ class PluginManager:
         self.docs_generators: list[Callable[..., Any]] = []
         self.deployment_providers: list[Callable[..., Any]] = []
         self.observability_providers: list[Callable[..., Any]] = []
-        self.notification_providers: list[Callable[..., Any]] = {}
+        self.notification_providers: dict[str, Callable[..., Any]] = {}
         self.git_service: Any = None
 
     # ------------------------------------------------------------------
@@ -695,14 +695,3 @@ __all__ = [
 
 # Silence the unused-import warnings for symbols only used in some
 # branches of the public surface.
-_ = Provider
-_ = Analyzer
-_ = Path
-_ = EntryPoint
-_ = Any
-_ = Compatibility
-_ = tuple
-_ = dict
-_ = list
-_ = Iterable
-_ = os

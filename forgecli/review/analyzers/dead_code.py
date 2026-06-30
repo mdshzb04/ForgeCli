@@ -236,7 +236,7 @@ class DeadCodeAnalyzer(Analyzer):
             if isinstance(node, ast.Name):
                 references[(module, node.id)] += 1
             elif isinstance(node, ast.Attribute):
-                base = node
+                base: ast.expr = node
                 while isinstance(base, ast.Attribute):
                     base = base.value
                 if isinstance(base, ast.Name):

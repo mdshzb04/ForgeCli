@@ -75,6 +75,4 @@ def result_to_dict(result: BuildResult) -> dict[str, object]:
 __all__ = ["build_summary", "result_to_dict", "summarize"]
 
 
-# Silence unused-import warnings for symbols only used in some branches.
-_ = StageStatus
-_ = time
+# Silence unused-import warnings.

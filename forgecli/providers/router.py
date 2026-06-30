@@ -147,7 +147,7 @@ class ModelRouter:
 
     def select(
         self,
-        choice: str,
+        choice: str | None,
         *,
         capabilities: ModelCapabilities | None = None,
     ) -> RouteDecision:
