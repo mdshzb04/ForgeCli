@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import httpx
 from typing import Any
+
+import httpx
 
 from forgecli.providers.anthropic import AnthropicConfig, AnthropicProvider
 from forgecli.providers.base import ChatMessage, ChatRequest, Role

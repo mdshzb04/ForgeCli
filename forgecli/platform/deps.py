@@ -27,12 +27,11 @@ gets a ``brew install graphify`` line; on Windows, a
 from __future__ import annotations
 
 import shutil
-import sys
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Final
 
-from collections.abc import Callable
 from forgecli.platform.core import (
     OS,
     current_platform,

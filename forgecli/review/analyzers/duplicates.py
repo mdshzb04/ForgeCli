@@ -11,7 +11,6 @@ recall for speed and determinism.
 
 from __future__ import annotations
 
-import re
 import tokenize
 from collections import defaultdict
 from collections.abc import Iterable

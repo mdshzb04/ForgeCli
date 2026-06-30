@@ -23,7 +23,6 @@ import importlib.util
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
-from importlib.machinery import ModuleSpec
 from pathlib import Path
 from types import ModuleType
 

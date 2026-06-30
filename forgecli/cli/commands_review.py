@@ -119,8 +119,14 @@ def review_cmd(
         provider_cls = registry.get(chosen)
         provider = provider_cls()  # type: ignore[call-arg]
 
-    from forgecli.orchestrator import PluginRegistry, Orchestrator, ReviewWorkflow, HeuristicIntentClassifier
     import asyncio
+
+    from forgecli.orchestrator import (
+        HeuristicIntentClassifier,
+        Orchestrator,
+        PluginRegistry,
+        ReviewWorkflow,
+    )
 
     registry_obj = PluginRegistry()
     registry_obj.register_classifier(HeuristicIntentClassifier())

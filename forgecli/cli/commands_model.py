@@ -98,7 +98,7 @@ def list_cmd() -> None:
         console.print(f"[{color}]{status_char}[/{color}] [bold]{p_name}[/bold]{default_suffix}")
 
         p_models = [m for m in MODEL_CATALOG if m.provider == p_id]
-        
+
         dynamic_models = []
         if p_id in ["ollama", "lmstudio", "vllm"]:
             try:

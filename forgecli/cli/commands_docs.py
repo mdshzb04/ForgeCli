@@ -8,7 +8,7 @@ from pathlib import Path
 import typer
 
 from forgecli.cli.bootstrap import bootstrap_context
-from forgecli.cli.ui import error, get_console, success, warn, info
+from forgecli.cli.ui import error, get_console, success, warn
 from forgecli.docs.generator import generate_docs
 from forgecli.orchestrator import (
     DocsWorkflow,
@@ -17,7 +17,6 @@ from forgecli.orchestrator import (
     PluginRegistry,
 )
 from forgecli.providers.mock import MockProvider, MockProviderConfig
-from forgecli.utils.paths import to_privacy_path
 
 app = typer.Typer(
     help="Auto-generate a project overview from the knowledge graph.",

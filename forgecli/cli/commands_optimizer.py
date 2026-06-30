@@ -11,7 +11,7 @@ from pathlib import Path
 import typer
 
 from forgecli.cli.bootstrap import bootstrap_context
-from forgecli.cli.ui import error, get_console, success, table
+from forgecli.cli.ui import get_console, success, table
 from forgecli.optimizer.ponytail import Intensity, PonytailRulesetOptimizer
 from forgecli.optimizer.ponytail.state import OptimizerState
 from forgecli.providers.base import ChatMessage, ChatRequest, Role
@@ -185,7 +185,7 @@ def preview_cmd(
     system_msg = next(
         (m.content for m in result.request.messages if m.role is Role.SYSTEM), ""
     )
-    
+
     strategy = _resolve_ruleset_label(state)
     token_red = "0%" if state.intensity is Intensity.OFF else "15-30% (fewer lines of code)"
     context_savings = "0 tokens" if state.intensity is Intensity.OFF else "120-250 tokens per exchange"

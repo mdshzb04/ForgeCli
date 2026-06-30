@@ -23,10 +23,9 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
-import os
 import shutil
 import subprocess
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -36,8 +35,6 @@ from forgecli.platform.core import (
     python_version,
 )
 from forgecli.platform.paths import config_dir, data_dir
-from forgecli.providers.base import Provider
-from forgecli.review.analyzer import Analyzer
 from forgecli.sdk.events import (
     HookManager,
     PluginEvent,
@@ -53,7 +50,6 @@ from forgecli.sdk.loader import (
 )
 from forgecli.sdk.manifest import (
     Compatibility,
-    EntryPoint,
     EntryPointKind,
     PluginManifest,
     is_valid_plugin_name,

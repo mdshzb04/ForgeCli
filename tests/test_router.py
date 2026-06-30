@@ -17,7 +17,6 @@ from forgecli.providers.router import (
 )
 
 
-
 @pytest.fixture(autouse=True)
 def mock_get_api_key(monkeypatch) -> None:
     monkeypatch.setattr("forgecli.core.credentials.get_api_key", lambda name: None)

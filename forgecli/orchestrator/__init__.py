@@ -317,25 +317,25 @@ class Orchestrator:
         try:
             prediction = self._classify(prompt)
             workflow = self._workflow_for(prediction)
-            
+
             app_ctx = _bootstrap_app_context()
-            from forgecli.optimizer.ponytail import PromptOptimizer
             from forgecli.graph.repository import RepositoryGraph
-            
+            from forgecli.optimizer.ponytail import PromptOptimizer
+
             opt = None
             if app_ctx.container.has(PromptOptimizer):
                 opt = app_ctx.container.resolve(PromptOptimizer)  # type: ignore[type-abstract]
-            
+
             graph = None
             if app_ctx.container.has(RepositoryGraph):
                 graph = app_ctx.container.resolve(RepositoryGraph)  # type: ignore[type-abstract]
-                
+
             build_extras = {
                 "provider": self._provider,
                 "optimizer": opt,
                 "graph": graph,
             }
-            
+
             plugin_context = PluginContext(
                 app_context=app_ctx,
                 prompt=prompt,
@@ -464,8 +464,8 @@ class DocsWorkflow(Workflow):
 
     async def run(self, context: PluginContext) -> dict[str, Any]:
         from forgecli.build import BuildContext, BuildPipeline
-        from forgecli.build.optimize import ponytail_optimization
         from forgecli.build.llm import llm_call
+        from forgecli.build.optimize import ponytail_optimization
         from forgecli.build.summarize import summarize
 
         root = context.app_context.cwd
@@ -476,15 +476,15 @@ class DocsWorkflow(Workflow):
             if any(part in {"__pycache__", "node_modules", ".venv", "venv"} for part in path.parts):
                 continue
             files_info.append(str(path.relative_to(root)))
-        
+
         prompt = (
             f"Generate a comprehensive overview documentation for the project '{root.name}'.\n"
             f"Here are the main files in the project:\n"
             + "\n".join(f"- {f}" for f in files_info[:30]) + "\n\n"
-            f"Produce a clean, professional, and well-structured Markdown document containing:\n"
-            f"1. Executive Summary of the project purpose.\n"
-            f"2. High-level architecture overview.\n"
-            f"3. Key modules and entry points."
+            "Produce a clean, professional, and well-structured Markdown document containing:\n"
+            "1. Executive Summary of the project purpose.\n"
+            "2. High-level architecture overview.\n"
+            "3. Key modules and entry points."
         )
 
         build_context = BuildContext(prompt=prompt, root=Path.cwd())
@@ -517,24 +517,24 @@ class ReviewWorkflow(Workflow):
     intents = (Intent.REVIEW,)
 
     async def run(self, context: PluginContext) -> dict[str, Any]:
-        from forgecli.review import review_repository
         from forgecli.build import BuildContext, BuildPipeline
-        from forgecli.build.optimize import ponytail_optimization
         from forgecli.build.llm import llm_call
+        from forgecli.build.optimize import ponytail_optimization
         from forgecli.build.summarize import summarize
+        from forgecli.review import review_repository
 
         review = review_repository(Path.cwd())
-        
+
         prompt = (
             f"Review the code quality scan findings for the project:\n\n"
             f"Findings: {len(review.findings)} total.\n"
             f"Suggestions: {len(review.suggestions)} total.\n\n"
             f"Summarize the findings and provide key quality improvement recommendations."
         )
-        
+
         build_context = BuildContext(prompt=prompt, root=Path.cwd())
         build_context.extras.update(context.extras.get("build_extras", {}))
-        
+
         pipeline = BuildPipeline(
             [
                 ("ponytail-optimize", ponytail_optimization),
@@ -544,7 +544,7 @@ class ReviewWorkflow(Workflow):
         )
         result = await pipeline.run(build_context)
         ai_summary = result.context.response.message.content if result.context.response else ""
-        
+
         summary = (
             f"Reviewed {review.stats.get('files', 0)} files; "
             f"{len(review.findings)} findings.\n\n"
@@ -564,8 +564,8 @@ class ExplainWorkflow(Workflow):
 
     async def run(self, context: PluginContext) -> dict[str, Any]:
         from forgecli.build import BuildContext, BuildPipeline
-        from forgecli.build.optimize import ponytail_optimization
         from forgecli.build.llm import llm_call
+        from forgecli.build.optimize import ponytail_optimization
         from forgecli.build.retrieval import graphify_retrieval
         from forgecli.build.summarize import summarize
 

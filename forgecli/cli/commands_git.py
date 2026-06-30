@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+
 import typer
 
 from forgecli.cli.bootstrap import bootstrap_context
 from forgecli.cli.commands_commit import _git_commit
 from forgecli.cli.commands_forge import _build_provider_for
 from forgecli.cli.ui import error, get_console, success, warn
-from forgecli.commit.git_utils import GitRepoError, diff_staged, is_git_repo
+from forgecli.commit.git_utils import diff_staged, is_git_repo
 from forgecli.core.errors import GitError
 from forgecli.optimizer.ponytail import PromptOptimizer
 from forgecli.providers.base import ChatMessage, ChatRequest, Role
@@ -48,13 +49,13 @@ async def _generate_ai_commit_message(project: Path) -> str:
         raise typer.Exit(code=1)
 
     app_context = bootstrap_context(cwd=project)
-    
+
     # 3. Use the configured provider and selected model.
     try:
         provider = _build_provider_for(live=True, cwd=project)
     except Exception as exc:
         error(str(exc))
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from exc
 
     optimizer = app_context.container.resolve(PromptOptimizer)  # type: ignore[type-abstract]
     router = app_context.container.resolve(ModelRouter)  # type: ignore[type-abstract]
@@ -86,7 +87,7 @@ async def _generate_ai_commit_message(project: Path) -> str:
 
     # 2. Use Ponytail.
     optimized_request = await optimizer.optimize_chat(request)
-    
+
     response = await provider.chat(optimized_request.request)
     commit_msg = response.message.content.strip()
 
@@ -129,10 +130,7 @@ def git_commit(
         error(f"{project} is not inside a git working tree.")
         raise typer.Exit(code=1)
 
-    if message:
-        commit_msg = message
-    else:
-        commit_msg = asyncio.run(_generate_ai_commit_message(project))
+    commit_msg = message or asyncio.run(_generate_ai_commit_message(project))
 
     if not yes:
         console = get_console()
@@ -146,7 +144,7 @@ def git_commit(
             input()
         except (KeyboardInterrupt, EOFError):
             console.print("\n[yellow]Commit cancelled.[/yellow]")
-            raise typer.Exit(0)
+            raise typer.Exit(0) from None
 
     sha = _git_commit(commit_msg, project, signoff=False)
     if sha:

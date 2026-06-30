@@ -12,7 +12,6 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-
 from typing import ClassVar
 
 from forgecli.review.finding import Finding

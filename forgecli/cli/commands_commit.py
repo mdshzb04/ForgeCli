@@ -15,7 +15,6 @@ touching anything.
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
 import os
 import subprocess
@@ -24,7 +23,7 @@ from pathlib import Path
 import typer
 
 from forgecli.cli.ui import error, get_console, info, success, table, warn
-from forgecli.commit.analyzer import CommitAnalyzer, CommitKind
+from forgecli.commit.analyzer import CommitAnalyzer
 from forgecli.commit.changelog import Changelog
 from forgecli.commit.git_utils import (
     GitRepoError,
@@ -34,7 +33,6 @@ from forgecli.commit.git_utils import (
     has_staged_changes,
     is_git_repo,
     push,
-    status_porcelain,
 )
 from forgecli.commit.message import build_message, build_subject
 from forgecli.commit.release_notes import build_release_notes

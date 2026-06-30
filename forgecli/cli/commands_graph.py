@@ -17,11 +17,9 @@ from forgecli.cli.ui import (
     get_console,
     info,
     success,
-    table,
     warn,
 )
 from forgecli.graph.backend_graphify import GraphifyRepositoryGraph
-from forgecli.graph.repository import GraphEdge
 from forgecli.utils.paths import to_privacy_path
 
 app = typer.Typer(

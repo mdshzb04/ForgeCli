@@ -127,10 +127,7 @@ async def run_capture(
     """Async wrapper around :func:`run`."""
     argv: tuple[str, ...]
     if isinstance(args, str):
-        if is_windows():
-            argv = ("cmd.exe", "/c", args)
-        else:
-            argv = (args,)
+        argv = ("cmd.exe", "/c", args) if is_windows() else (args,)
     else:
         argv = tuple(args)
 
