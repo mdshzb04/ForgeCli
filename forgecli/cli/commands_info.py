@@ -61,16 +61,18 @@ def info_cmd(
     t_system.add_row("Python Executable", sys.executable)
     t_system.add_row("WSL", "Yes" if platform.is_wsl else "No")
 
+    from forgecli.utils.paths import to_privacy_path
+
     t_app = Table(title="⚙ Application details", show_header=False, expand=True, box=box.SIMPLE)
     t_app.add_column("Key", style="dim cyan")
     t_app.add_column("Value")
     t_app.add_row("App Name", __app_name__)
     t_app.add_row("App Version", __version__)
-    t_app.add_row("Config Directory", str(paths.config_dir))
-    t_app.add_row("Data Directory", str(paths.data_dir))
-    t_app.add_row("Cache Directory", str(paths.cache_dir))
-    t_app.add_row("Logs Directory", str(paths.logs_dir))
-    t_app.add_row("Plugins Directory", str(paths.plugins_dir))
+    t_app.add_row("Config Directory", to_privacy_path(paths.config_dir))
+    t_app.add_row("Data Directory", to_privacy_path(paths.data_dir))
+    t_app.add_row("Cache Directory", to_privacy_path(paths.cache_dir))
+    t_app.add_row("Logs Directory", to_privacy_path(paths.logs_dir))
+    t_app.add_row("Plugins Directory", to_privacy_path(paths.plugins_dir))
 
     console.print(Panel(t_system, border_style="dim"))
     console.print()

@@ -23,6 +23,7 @@ from forgecli.review import (
     review_to_json,
     review_to_markdown,
 )
+from forgecli.utils.paths import to_privacy_path
 
 app = typer.Typer(
     help="Run a code-quality review (security, performance, architecture, "
@@ -71,6 +72,11 @@ def review_cmd(
         "--fail-on-critical",
         help="Exit with code 1 if any critical finding is present.",
     ),
+    full: bool = typer.Option(
+        False,
+        "--full",
+        help="Display all findings without capping at Top 10.",
+    ),
 ) -> None:
     """Run the full repository review and print a report."""
     if ctx.invoked_subcommand is not None:
@@ -83,11 +89,11 @@ def review_cmd(
         if md_output or save.suffix == ".md":
             target = save if save.suffix == ".md" else save.with_suffix(".md")
             target.write_text(review_to_markdown(review), encoding="utf-8")
-            success(f"Markdown report written to {target}.")
+            success(f"Markdown report written to {to_privacy_path(target)}.")
         else:
             target = save if save.suffix == ".json" else save.with_suffix(".json")
             target.write_text(review_to_json(review), encoding="utf-8")
-            success(f"JSON report written to {target}.")
+            success(f"JSON report written to {to_privacy_path(target)}.")
 
     if json_output:
         sys.stdout.write(review_to_json(review))
@@ -97,7 +103,7 @@ def review_cmd(
         sys.stdout.write(review_to_markdown(review))
         sys.stdout.flush()
     else:
-        print_review(review, console=get_console())
+        print_review(review, console=get_console(), full=full)
 
     _print_summary(review)
     if fail_on_critical and review.is_blocking:

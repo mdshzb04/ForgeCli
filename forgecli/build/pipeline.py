@@ -30,6 +30,7 @@ def default_pipeline(
     graph: Any | None = None,
     test_command: str | None = None,
     test_timeout: float = 120.0,
+    skip_tests: bool = False,
 ) -> BuildPipeline:
     """Construct the canonical pipeline."""
     stages: list[tuple[str, PipelineStage]] = [
@@ -38,9 +39,10 @@ def default_pipeline(
         ("llm", _stage_with(llm_call, provider=provider)),
         ("diff-extract", diff_extraction),
         ("apply-diff", apply_diff),
-        ("run-tests", _stage_with(run_tests, test_command=test_command, test_timeout=test_timeout)),
-        ("summarize", summarize),
     ]
+    if not skip_tests:
+        stages.append(("run-tests", _stage_with(run_tests, test_command=test_command, test_timeout=test_timeout)))
+    stages.append(("summarize", summarize))
     return BuildPipeline(stages)
 
 

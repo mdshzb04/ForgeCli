@@ -71,7 +71,7 @@ def _cache_path() -> Path:
     return directory / CACHE_FILENAME
 
 
-def _read_cache() -> dict[str, object] | None:
+def _read_cache(*, ignore_expiry: bool = False) -> dict[str, object] | None:
     """Return the cached update payload, or None if missing/expired."""
     path = _cache_path()
     if not path.exists():
@@ -85,7 +85,7 @@ def _read_cache() -> dict[str, object] | None:
     checked_at = payload.get("checked_at")
     if not isinstance(checked_at, (int, float)):
         return None
-    if (time.time() - float(checked_at)) > _cache_ttl():
+    if not ignore_expiry and (time.time() - float(checked_at)) > _cache_ttl():
         return None
     return payload
 
@@ -151,6 +151,17 @@ def check_for_update(
             response.raise_for_status()
             payload = response.json()
     except Exception as exc:
+        cached = _read_cache(ignore_expiry=True)
+        if cached is not None:
+            latest = cached.get("latest")
+            if isinstance(latest, str):
+                return UpdateInfo(
+                    current=current_version(),
+                    latest=latest,
+                    update_available=_is_newer(latest, current_version()),
+                    checked_at=datetime.now(UTC),
+                    error=f"Offline fallback (error: {exc!r})",
+                )
         return UpdateInfo(
             current=current_version(),
             latest=None,

@@ -124,8 +124,13 @@ def status_cmd() -> None:
     """Show the current intensity, backend, and binary path."""
     context = bootstrap_context()
     state = _load_persisted(_state_path(context.paths))
+    settings = context.resolve_settings()
+    global_enabled = settings.prompt_optimizer.enabled
+    effective_enabled = global_enabled and (state.intensity is not Intensity.OFF)
     ruleset = _resolve_ruleset_label(state)
     rows = [
+        ["enabled (global config)", "Yes" if global_enabled else "No"],
+        ["enabled (effective)", "Yes" if effective_enabled else "No"],
         ["intensity", state.intensity.value],
         ["backend", state.backend],
         ["binary", state.binary],

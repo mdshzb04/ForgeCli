@@ -192,6 +192,61 @@ class GraphifyClient:
             stderr=stderr.decode(errors="replace"),
         )
 
+    async def update(
+        self,
+        root: Path,
+        *,
+        force: bool = False,
+        no_cluster: bool = False,
+    ) -> GraphifyBuildOutcome:
+        """Run ``graphify update <root>`` and return the parsed outcome."""
+        binary = await self.detect()
+        if binary is None:
+            raise GraphifyNotFoundError(
+                f"Graphify executable {self._executable!r} not found on PATH"
+            )
+
+        root = root.resolve()
+        args: list[str] = [
+            binary,
+            "update",
+            str(root),
+        ]
+        if force:
+            args.append("--force")
+        if no_cluster:
+            args.append("--no-cluster")
+
+        proc = await asyncio.create_subprocess_exec(
+            *args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=str(root),
+        )
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                proc.communicate(), timeout=self._timeout
+            )
+        except TimeoutError as exc:
+            proc.kill()
+            raise GraphifyInvocationError(
+                f"graphify update timed out after {self._timeout}s"
+            ) from exc
+
+        if proc.returncode != 0:
+            raise GraphifyInvocationError(
+                "graphify update failed (exit "
+                f"{proc.returncode}):\n{stderr.decode(errors='replace').strip()}"
+            )
+
+        artifacts = GraphifyArtifacts.for_root(root)
+        return GraphifyBuildOutcome(
+            root=root,
+            artifacts=artifacts,
+            stdout=stdout.decode(errors="replace"),
+            stderr=stderr.decode(errors="replace"),
+        )
+
     async def cluster_only(
         self,
         root: Path,

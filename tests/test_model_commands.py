@@ -88,3 +88,15 @@ def test_cli_model_list_works(monkeypatch, tmp_path: Path) -> None:
     output = result.output
     for name in ("openai", "anthropic", "google", "mock"):
         assert name in output
+
+
+def test_cli_model_preview_override(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("FORGECLI_DATA_DIR", str(tmp_path))
+    runner = CliRunner()
+    result = runner.invoke(app, ["model", "openai", "--model", "gpt-4o"])
+    assert result.exit_code == 0
+    result_preview = runner.invoke(app, ["model", "preview"])
+    assert result_preview.exit_code == 0
+    assert "gpt-4o" in result_preview.output
+    assert "gpt-4o-mini" not in result_preview.output
+

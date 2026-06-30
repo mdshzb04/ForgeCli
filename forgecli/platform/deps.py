@@ -277,16 +277,16 @@ _HINTS: Final[dict[str, dict[OS, tuple[str, ...]]]] = {
     "graphify": {
         OS.LINUX: (
             "uv tool install graphifyy",
-            "or:  pipx install graphify",
-            "or:  pip install --user graphify",
+            "or:  pipx install graphifyy",
+            "or:  pip install --user graphifyy",
         ),
         OS.MACOS: (
-            "brew install graphify",
+            "brew install graphifyy",
             "or:  uv tool install graphifyy",
         ),
         OS.WINDOWS: (
-            "winget install graphify",
-            "or:  scoop install graphify",
+            "winget install graphifyy",
+            "or:  scoop install graphifyy",
             "or:  uv tool install graphifyy",
         ),
         OS.OTHER: ("uv tool install graphifyy",),

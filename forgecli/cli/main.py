@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import signal
+import sys
 import warnings
 from pathlib import Path
 
@@ -41,6 +44,9 @@ from forgecli.core.errors import ForgeCLIError
 # Suppress all runtime warnings globally to present a clean, production-grade CLI.
 warnings.filterwarnings("ignore")
 
+with contextlib.suppress(AttributeError):
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+
 app = typer.Typer(
     name=__app_name__,
     help="ForgeCLI - AI Development Operating System.",
@@ -57,20 +63,131 @@ app.add_typer(commands_index.app, name="index")
 app.add_typer(commands_graph.app, name="graph")
 app.add_typer(commands_optimizer.app, name="optimizer")
 app.add_typer(commands_plan.app, name="plan")
-app.add_typer(commands_build.app, name="build")
+
+app.command(
+    "build",
+    help="Run the build pipeline (Graphify → Ponytail → LLM → apply → test → summarize).",
+    context_settings={"allow_interspersed_args": True},
+)(commands_build.build_cmd)
+
 app.add_typer(commands_commit.app, name="commit")
 app.add_typer(commands_review.app, name="review")
-app.add_typer(commands_ask.app, name="ask")
+
+app.command(
+    "ask",
+    help="Ask a question about the repository (uses Graphify + Ponytail + LLM).",
+    context_settings={"allow_interspersed_args": True},
+)(commands_ask.ask_cmd)
+
 app.add_typer(commands_docs.app, name="docs")
-app.add_typer(commands_release.app, name="release")
+
+app.command(
+    "release",
+    help="Cut a release (changelog promotion, tag, optional push).",
+    context_settings={"allow_interspersed_args": True},
+)(commands_release.release_cmd)
+
 app.add_typer(commands_git.app, name="git")
 app.add_typer(commands_history.app, name="history")
-app.add_typer(commands_explain.app, name="explain")
+
+app.command(
+    "explain",
+    help="Explain a node, file, or symbol using the Graphify knowledge graph.",
+    context_settings={"allow_interspersed_args": True},
+)(commands_explain.main)
+
 app.add_typer(commands_doctor.app, name="doctor")
 app.add_typer(commands_plugin.app, name="plugin")
 app.add_typer(commands_status.app, name="status")
 app.add_typer(commands_info.app, name="info")
 app.add_typer(commands_update.app, name="update")
+
+
+# Wrap click's invoke method to record history for all commands
+try:
+    import typer.main
+    original_get_command = typer.main.get_command
+
+    def wrapped_get_command(typer_instance):
+        click_command = original_get_command(typer_instance)
+        if typer_instance is app:
+            original_invoke = click_command.invoke
+
+            def wrapped_invoke(ctx):
+                import sys
+                import time
+
+                from forgecli.cli.bootstrap import bootstrap_context
+                from forgecli.memory.history import HistoryRepository
+                from forgecli.memory.store import MemoryStore
+
+                start_time = time.time()
+                success = True
+                err_msg = None
+                try:
+                    return original_invoke(ctx)
+                except Exception as exc:
+                    success = False
+                    err_msg = str(exc)
+                    raise
+                except BaseException as exc:
+                    success = False
+                    err_msg = str(exc)
+                    raise
+                finally:
+                    cmd = " ".join(sys.argv)
+                    if len(sys.argv) > 0 and ("pytest" in sys.argv[0] or "py.test" in sys.argv[0]):
+                        cmd = ctx.command_path
+                        if ctx.invoked_subcommand:
+                            cmd += " " + ctx.invoked_subcommand
+                        if ctx.args:
+                            cmd += " " + " ".join(ctx.args)
+
+                    is_history_list = "history" in cmd
+                    is_help = "--help" in cmd or "-h" in cmd or (ctx.invoked_subcommand == "help" if ctx.invoked_subcommand else False)
+                    is_version = "--version" in cmd or "-v" in cmd or "--check-update" in cmd
+
+                    if not (is_history_list or is_help or is_version or (len(sys.argv) < 2 and "pytest" not in sys.argv[0])):
+                        try:
+                            context = bootstrap_context()
+                            store = context.container.resolve(MemoryStore)
+                            provider = None
+                            model = None
+                            try:
+                                from forgecli.providers.router_state import load_state
+                                state = load_state(context.paths.data_dir / "router.json")
+                                if state.choice:
+                                    provider = state.provider
+                                    model = state.model
+                            except Exception:
+                                pass
+
+                            duration_ms = int((time.time() - start_time) * 1000)
+                            with store:
+                                history = HistoryRepository(store)
+                                history.record(
+                                    command=cmd,
+                                    provider=provider,
+                                    model=model,
+                                    duration_ms=duration_ms,
+                                    success=success,
+                                    error=err_msg,
+                                )
+                        except Exception:
+                            pass
+
+            click_command.invoke = wrapped_invoke
+        return click_command
+
+    typer.main.get_command = wrapped_get_command
+    try:
+        import typer.testing
+        typer.testing._get_command = wrapped_get_command
+    except Exception:
+        pass
+except Exception as e:
+    print(f"DEBUG: monkeypatch failed with {e}", file=sys.stderr)
+    pass
 
 
 def _version_callback(value: bool) -> None:
@@ -87,7 +204,10 @@ def _check_update_callback(value: bool) -> None:
 
     info = check_for_update()
     if info.error and info.latest is None:
-        warn(f"could not check for updates: {info.error}")
+        if "404" in info.error:
+            warn("could not check for updates: ForgeCLI is not published to PyPI yet (development installation).")
+        else:
+            warn(f"could not check for updates: {info.error}")
     elif info.update_available:
         warn(
             f"update available: {info.current} -> {info.latest}\n"
@@ -208,11 +328,67 @@ def main(
 
 def _run() -> None:
     """Run the Typer app and translate ForgeCLIError to clean exit codes."""
+    import sys
+    import time
+
+    from forgecli.cli.bootstrap import bootstrap_context
+    from forgecli.memory.history import HistoryRepository
+    from forgecli.memory.store import MemoryStore
+
+    start_time = time.time()
+    cmd = " ".join(sys.argv)
+
+    is_history_list = len(sys.argv) >= 2 and sys.argv[1] == "history"
+    is_help = "--help" in sys.argv or "-h" in sys.argv
+    is_version = "--version" in sys.argv or "-v" in sys.argv or "--check-update" in sys.argv
+
+    success = True
+    err_msg = None
     try:
         app()
     except ForgeCLIError as exc:
+        success = False
+        err_msg = str(exc)
         error(str(exc))
         raise SystemExit(2) from exc
+    except SystemExit as exc:
+        if exc.code != 0:
+            success = False
+            err_msg = f"Exit code: {exc.code}"
+        raise
+    except BaseException as exc:
+        success = False
+        err_msg = str(exc)
+        raise
+    finally:
+        if not (is_history_list or is_help or is_version or len(sys.argv) < 2):
+            try:
+                context = bootstrap_context()
+                store = context.container.resolve(MemoryStore)
+                provider = None
+                model = None
+                try:
+                    from forgecli.providers.router_state import load_state
+                    state = load_state(context.paths.data_dir / "router.json")
+                    if state.choice:
+                        provider = state.provider
+                        model = state.model
+                except Exception:
+                    pass
+
+                duration_ms = int((time.time() - start_time) * 1000)
+                with store:
+                    history = HistoryRepository(store)
+                    history.record(
+                        command=cmd,
+                        provider=provider,
+                        model=model,
+                        duration_ms=duration_ms,
+                        success=success,
+                        error=err_msg,
+                    )
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":

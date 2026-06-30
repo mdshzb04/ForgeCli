@@ -26,13 +26,14 @@ app = typer.Typer(
     help="Cut a release (changelog promotion, tag, optional push).",
     invoke_without_command=True,
     rich_markup_mode="rich",
+    context_settings={"allow_interspersed_args": True},
 )
 
 
 _SEMVER = re.compile(r"^v?\d+\.\d+\.\d+([\-+].+)?$")
 
 
-@app.callback(invoke_without_command=True)
+@app.callback(invoke_without_command=True, context_settings={"allow_interspersed_args": True})
 def release_cmd(
     ctx: typer.Context,
     version: str = typer.Argument(..., help="Version to release (e.g. 1.2.0)."),

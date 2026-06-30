@@ -25,7 +25,6 @@ from forgecli.providers.base import (
     Role,
 )
 
-
 # Plugin-level configuration. The SDK merges ``default_config()``
 # into the persisted config under ``plugin.demo``.
 _DEFAULT_CONFIG: dict[str, Any] = {

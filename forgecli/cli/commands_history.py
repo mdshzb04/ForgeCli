@@ -9,14 +9,24 @@ from forgecli.cli.ui import table
 from forgecli.memory.history import HistoryRepository
 from forgecli.memory.store import MemoryStore
 
-app = typer.Typer(help="Inspect local CLI history.", no_args_is_help=True)
+app = typer.Typer(
+    help="Inspect local CLI history.",
+    rich_markup_mode="rich",
+)
+
+
+@app.callback(invoke_without_command=True)
+def callback(ctx: typer.Context) -> None:
+    """Inspect local CLI history."""
+    if ctx.invoked_subcommand is None:
+        ctx.invoke(list_cmd, limit=20)
 
 
 @app.command("list")
 def list_cmd(
     limit: int = typer.Option(20, "--limit", "-n", help="Maximum entries to show."),
 ) -> None:
-    """Show the most recent history entries (placeholder)."""
+    """Show the most recent history entries."""
     context = bootstrap_context()
     store: MemoryStore = context.container.resolve(MemoryStore)
     with store:

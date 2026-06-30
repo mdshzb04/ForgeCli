@@ -20,6 +20,7 @@ from forgecli.cli.ui import get_console
 from forgecli.config import ConfigLoader
 from forgecli.platform import ProjectPaths, current_platform
 from forgecli.sdk import PluginManager
+from forgecli.utils.paths import to_privacy_path
 
 app = typer.Typer(
     help="Show the status of the current workspace and ForgeCLI settings.",
@@ -76,7 +77,7 @@ def status_cmd(
         Panel(
             Align.center(
                 f"[bold cyan]ForgeCLI Workspace Status[/bold cyan]\n"
-                f"[dim]Project Root: {target_path}[/dim]"
+                f"[dim]Project Root: {to_privacy_path(target_path)}[/dim]"
             ),
             border_style="cyan",
         )

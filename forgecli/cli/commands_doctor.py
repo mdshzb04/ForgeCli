@@ -30,6 +30,7 @@ from forgecli.platform import (
 )
 from forgecli.platform.deps import DependencyStatus
 from forgecli.sdk import PluginManager
+from forgecli.utils.paths import to_privacy_path
 
 app = typer.Typer(
     help="Diagnose the current host (OS, dependencies, configuration, keys).",
@@ -72,7 +73,7 @@ def doctor_cmd(
     plugin_info = _get_plugin_status(paths)
 
     # ── 5. Health Score Calculation ───────────────────────────────────
-    health_score, reasons = _calculate_health_score(report, api_status, git_info, graph_info)
+    health_score, breakdown, reasons, deductions = _calculate_health_score(report, api_status, git_info, graph_info)
 
     if json_output:
         payload = {
@@ -81,9 +82,10 @@ def doctor_cmd(
             "arch": platform.arch,
             "python": python_version(),
             "is_wsl": platform.is_wsl,
-            "config_dir": str(paths.config_dir),
-            "data_dir": str(paths.data_dir),
+            "config_dir": to_privacy_path(paths.config_dir),
+            "data_dir": to_privacy_path(paths.data_dir),
             "health_score": health_score,
+            "health_score_breakdown": breakdown,
             "api_keys": api_status,
             "git": git_info,
             "graph": graph_info,
@@ -95,7 +97,7 @@ def doctor_cmd(
         sys.stdout.flush()
     else:
         _render_dashboard(
-            platform, paths, report, api_status, git_info, graph_info, plugin_info, health_score, reasons
+            platform, paths, report, api_status, git_info, graph_info, plugin_info, health_score, breakdown, reasons, deductions
         )
 
     if strict and report.missing_required:
@@ -171,58 +173,124 @@ def _get_plugin_status(paths: ProjectPaths) -> dict[str, Any]:
 
 def _calculate_health_score(
     report: Any, api_status: dict[str, bool], git_info: dict[str, Any], graph_info: dict[str, Any]
-) -> tuple[int, list[str]]:
-    score = 0
+) -> tuple[int, dict[str, int], list[str], list[str]]:
     reasons = []
+    deductions = []
 
-    # 1. Required deps (Python, Git) -> 40 points
-    missing_req = report.missing_required
-    if missing_req:
-        reasons.append(f"Missing required tools: {', '.join(d.name for d in missing_req)}")
-    else:
-        score += 40
-
-    # 2. Config & Env Files -> 20 points
+    # 1. Configuration (20 points max)
+    config_score = 0
     config_exists = Path("forgecli.toml").exists()
     env_exists = Path(".env").exists()
     if config_exists:
-        score += 10
+        config_score += 10
     else:
         reasons.append("Missing configuration file `forgecli.toml` (Run `forge init`)")
-
     if env_exists:
-        score += 10
+        config_score += 10
     else:
         reasons.append("Missing `.env` file (Run `forge init` to generate one)")
 
-    # 3. AI Providers -> 20 points
+    if config_score < 20:
+        deduct_pts = 20 - config_score
+        parts = []
+        if not config_exists:
+            parts.append("missing forgecli.toml")
+        if not env_exists:
+            parts.append("missing .env")
+        deductions.append(
+            f"[bold red]Configuration[/bold red] (-{deduct_pts} pts): due to {', '.join(parts)}.\n"
+            f"  [cyan]↳ Next Step:[/cyan] Run [bold]forge init[/bold] to generate configuration and environment files."
+        )
+
+    # 2. Git (20 points max)
+    git_score = 0
+    if git_info["is_repo"]:
+        git_score += 10
+        if git_info["head"] != "n/a":
+            git_score += 10
+        else:
+            reasons.append("Git repository is missing a HEAD commit")
+            deductions.append(
+                "[bold red]Git[/bold red] (-10 pts): repository lacks a HEAD commit.\n"
+                "  [cyan]↳ Next Step:[/cyan] Create your first commit using [bold]git commit -m 'Initial commit'[/bold]."
+            )
+    else:
+        reasons.append("Not a git repository (Initialize with `git init`)")
+        deductions.append(
+            "[bold red]Git[/bold red] (-20 pts): current folder is not a Git repository.\n"
+            "  [cyan]↳ Next Step:[/cyan] Initialize Git by running [bold]git init[/bold] in your project directory."
+        )
+
+    # 3. Graph Intelligence (20 points max)
+    graph_score = 0
+    if graph_info["graphify_installed"]:
+        graph_score += 10
+        if graph_info["index_built"]:
+            graph_score += 10
+        else:
+            reasons.append("Graphify index not built (Run `forge graph build`)")
+            deductions.append(
+                "[bold red]Graph Intelligence[/bold red] (-10 pts): Graphify index has not been built yet.\n"
+                "  [cyan]↳ Next Step:[/cyan] Build the index by running [bold]forge graph build[/bold]."
+            )
+    else:
+        reasons.append("Graphify not installed (Optional: `uv tool install graphifyy`)")
+        deductions.append(
+            "[bold red]Graph Intelligence[/bold red] (-20 pts): Graphify CLI is not installed.\n"
+            "  [cyan]↳ Next Step:[/cyan] Install Graphify: [bold]uv tool install graphifyy[/bold]."
+        )
+
+    # 4. AI Providers (20 points max)
+    providers_score = 0
     active_keys = sum(1 for val in api_status.values() if val)
     if active_keys > 0:
-        score += min(20, active_keys * 10)
+        providers_score += min(20, active_keys * 10)
     else:
         reasons.append("No AI Provider API keys found in environment variables")
 
-    # 4. Graphify -> 10 points
-    if graph_info["graphify_installed"]:
-        score += 5
-        if graph_info["index_built"]:
-            score += 5
+    if providers_score < 20:
+        deduct_pts = 20 - providers_score
+        if providers_score == 0:
+            deductions.append(
+                "[bold red]AI Providers[/bold red] (-20 pts): no API keys configured.\n"
+                "  [cyan]↳ Next Step:[/cyan] Add model API keys (e.g. export OPENAI_API_KEY='...') in your .env or shell."
+            )
         else:
-            reasons.append("Graphify index not built (Run `forge graph build`)")
-    else:
-        reasons.append("Graphify not installed (Optional: `uv tool install graphifyy`)")
+            deductions.append(
+                "[bold red]AI Providers[/bold red] (-10 pts): only one API key configured.\n"
+                "  [cyan]↳ Next Step:[/cyan] Optionally configure ANTHROPIC_API_KEY or GEMINI_API_KEY/GOOGLE_API_KEY for additional LLMs."
+            )
 
-    # 5. Git repository -> 10 points
-    if git_info["is_repo"]:
-        score += 5
-        if git_info["clean"]:
-            score += 5
-        else:
-            reasons.append("Git repository has unstaged or uncommitted changes")
+    # 5. Repository State (20 points max)
+    state_score = 0
+    missing_req = report.missing_required
+    if not missing_req:
+        state_score += 10
     else:
-        reasons.append("Not a git repository (Initialize with `git init`)")
+        reasons.append(f"Missing required tools: {', '.join(d.name for d in missing_req)}")
+        deductions.append(
+            f"[bold red]Repository State[/bold red] (-10 pts): missing required tools ({', '.join(d.name for d in missing_req)}).\n"
+            "  [cyan]↳ Next Step:[/cyan] Check the 'Dependency Guidance' section below to install missing tools."
+        )
 
-    return score, reasons
+    if git_info["clean"]:
+        state_score += 10
+    else:
+        reasons.append("Git repository has unstaged or uncommitted changes")
+        deductions.append(
+            "[bold red]Repository State[/bold red] (-10 pts): Git repository has uncommitted changes.\n"
+            "  [cyan]↳ Next Step:[/cyan] Commit your work or run [bold]git stash[/bold] to clean the working directory."
+        )
+
+    total_score = config_score + git_score + graph_score + providers_score + state_score
+    breakdown = {
+        "Configuration": config_score,
+        "Git": git_score,
+        "Graph Intelligence": graph_score,
+        "AI Providers": providers_score,
+        "Repository State": state_score,
+    }
+    return total_score, breakdown, reasons, deductions
 
 
 def _render_dashboard(
@@ -234,7 +302,9 @@ def _render_dashboard(
     graph_info: dict[str, Any],
     plugin_info: dict[str, Any],
     health_score: int,
+    breakdown: dict[str, int],
     reasons: list[str],
+    deductions: list[str],
 ) -> None:
     console = get_console()
     console.print()
@@ -269,22 +339,45 @@ def _render_dashboard(
             f"[{color}]{score_bar}[/]\n\n"
             f"[bold {color}]Status: {status_text}[/]"
         ),
-        title="[bold]Health Score[/bold]",
+        title="[bold]Overall Health[/bold]",
         border_style=color,
         padding=(1, 2),
     )
 
+    breakdown_lines = []
+    for category, category_score in breakdown.items():
+        filled = category_score // 2
+        bar_char = "█" * filled + "░" * (10 - filled)
+        cat_color = "green" if category_score >= 15 else "yellow" if category_score >= 10 else "red"
+        breakdown_lines.append(f"[bold cyan]{category:<20}[/bold cyan] [bold white]{category_score:>2}/20[/bold white] [{cat_color}]{bar_char}[/]")
+
+    breakdown_text = "\n".join(breakdown_lines)
+
     reasons_text = ""
     if reasons:
-        reasons_text = "\n".join(f"[yellow]•[/yellow] {reason}" for reason in reasons[:6])
-        if len(reasons) > 6:
-            reasons_text += f"\n[dim]... and {len(reasons) - 6} more improvements[/dim]"
+        reasons_text = "\n".join(f"[yellow]•[/yellow] {reason}" for reason in reasons[:5])
+        if len(reasons) > 5:
+            reasons_text += f"\n[dim]... and {len(reasons) - 5} more improvements[/dim]"
     else:
         reasons_text = "[green]✔ All checks passed perfectly! Your ForgeCLI workspace is fully ready.[/green]"
 
+    deductions_text = ""
+    if deductions:
+        deductions_text = "\n[bold white]Deductions & Actionable Next Steps:[/bold white]\n" + "\n".join(f"• {d}" for d in deductions)
+    else:
+        deductions_text = "\n[bold green]✔ All categories are at maximum health score! No actions required.[/bold green]"
+
+    verdict_content = (
+        "[bold white]Weighted Category Breakdown:[/bold white]\n"
+        f"{breakdown_text}\n\n"
+        "[bold white]Readiness Diagnosis:[/bold white]\n"
+        f"{reasons_text}\n"
+        f"{deductions_text}"
+    )
+
     verdict_panel = Panel(
-        reasons_text,
-        title="[bold]Readiness Diagnosis[/bold]",
+        verdict_content,
+        title="[bold]Diagnosis & Insights[/bold]",
         border_style="cyan" if health_score >= 70 else "yellow",
         padding=(1, 2),
     )
@@ -300,15 +393,26 @@ def _render_dashboard(
     t_platform.add_row("Arch", platform.arch)
     t_platform.add_row("Python", python_version())
     t_platform.add_row("WSL", "yes" if platform.is_wsl else "no")
-    t_platform.add_row("Config Dir", str(paths.config_dir))
-    t_platform.add_row("Data Dir", str(paths.data_dir))
+    t_platform.add_row("Config Dir", to_privacy_path(paths.config_dir))
+    t_platform.add_row("Data Dir", to_privacy_path(paths.data_dir))
 
     t_providers = Table(title="🔑 AI Providers", show_header=True, expand=True)
     t_providers.add_column("Provider Key", style="cyan")
     t_providers.add_column("Status")
+    t_providers.add_column("Action / Hint", style="dim")
+    key_hints = {
+        "OPENAI_API_KEY": "Get a key from platform.openai.com",
+        "ANTHROPIC_API_KEY": "Get a key from console.anthropic.com",
+        "GOOGLE_API_KEY": "Get a key from aistudio.google.com",
+        "GEMINI_API_KEY": "Get a key from aistudio.google.com",
+        "GROQ_API_KEY": "Get a key from console.groq.com",
+        "MISTRAL_API_KEY": "Get a key from console.mistral.ai",
+        "OPENROUTER_API_KEY": "Get a key from openrouter.ai",
+    }
     for key, is_active in api_status.items():
         val = "[green]✔ Configured[/green]" if is_active else "[red]✘ Missing[/red]"
-        t_providers.add_row(key, val)
+        hint = "[dim]Active & Ready[/dim]" if is_active else f"[yellow]{key_hints.get(key)}[/yellow]"
+        t_providers.add_row(key, val, hint)
 
     console.print(Columns([Panel(t_platform, border_style="dim"), Panel(t_providers, border_style="dim")], equal=True))
     console.print()
@@ -337,6 +441,8 @@ def _render_dashboard(
     t_plugins.add_row("Active Plugins", str(plugin_info["enabled_count"]))
     if plugin_info["plugins"]:
         t_plugins.add_row("Loaded List", ", ".join(plugin_info["plugins"]))
+    else:
+        t_plugins.add_row("How to Install", "[dim]No active plugins found. Register plugins in pyproject.toml under [project.entry-points.\"forgecli.plugins\"] group.[/dim]")
 
     console.print(
         Columns(

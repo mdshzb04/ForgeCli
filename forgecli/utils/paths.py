@@ -54,3 +54,17 @@ class ProjectPaths:
         ):
             getattr(self, attr).mkdir(parents=True, exist_ok=True)
         return self
+
+
+def to_privacy_path(p: Path | str | None) -> str:
+    """Convert an absolute path to a home-relative path with ~ for privacy."""
+    if p is None:
+        return ""
+    try:
+        path_obj = Path(p).resolve()
+        home = Path.home().resolve()
+        if home in path_obj.parents or path_obj == home:
+            return f"~/{path_obj.relative_to(home)}"
+        return str(path_obj)
+    except Exception:
+        return str(p)

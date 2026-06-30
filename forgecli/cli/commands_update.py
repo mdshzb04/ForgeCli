@@ -37,12 +37,18 @@ def update_cmd(
         try:
             info = check_for_update(force=force)
         except Exception as exc:
-            warn(f"Failed to check for updates: {exc}")
-            raise typer.Exit(code=1) from exc
+            if "404" in str(exc):
+                warn("Could not contact update registry: ForgeCLI is not published to PyPI yet (development installation).")
+            else:
+                warn(f"Could not contact update registry: {exc}")
+            raise typer.Exit(code=0) from None
 
     if info.error and info.latest is None:
-        warn(f"Could not contact update registry: {info.error}")
-        raise typer.Exit(code=1)
+        if "404" in info.error:
+            warn("Could not contact update registry: ForgeCLI is not published to PyPI yet (development installation).")
+        else:
+            warn(f"Could not contact update registry: {info.error}")
+        raise typer.Exit(code=0) from None
 
     if info.update_available:
         console.print(

@@ -27,8 +27,6 @@ import typer
 from forgecli.build import BuildPipeline, BuildResult
 from forgecli.build.pipeline import build_context_from, default_pipeline
 from forgecli.build.summarize import result_to_dict
-from forgecli.builder.builder import Builder
-from forgecli.builder.builder import BuildResult as LegacyBuildResult
 from forgecli.cli.bootstrap import bootstrap_context
 from forgecli.cli.ui import error, get_console, info, success, table
 from forgecli.engine.runner import (
@@ -49,6 +47,7 @@ app = typer.Typer(
     help="Run the build pipeline (Graphify → Ponytail → LLM → apply → test → summarize).",
     no_args_is_help=True,
     rich_markup_mode="rich",
+    context_settings={"allow_interspersed_args": True},
 )
 
 
@@ -57,7 +56,7 @@ app = typer.Typer(
 # ---------------------------------------------------------------------------
 
 
-@app.callback(invoke_without_command=True)
+@app.callback(invoke_without_command=True, context_settings={"allow_interspersed_args": True})
 def build_cmd(
     ctx: typer.Context,
     prompt: str = typer.Argument(..., help="Natural-language description of the change to make."),
@@ -227,7 +226,8 @@ async def _run_build(
         provider=provider,
         optimizer=optimizer,
         graph=graph,
-        test_command=None if no_tests else test_command,
+        test_command=test_command,
+        skip_tests=no_tests,
     )
     if retries:
         build_context.extras["retries"] = retries
@@ -270,18 +270,7 @@ def _render(result: BuildResult) -> None:
         error(f"Build failed at stage: {result.failure_stage}")
 
 
-# ---------------------------------------------------------------------------
-# Backwards-compatible `forge build run`
-# ---------------------------------------------------------------------------
 
-
-@app.command("run")
-def run() -> None:
-    """Run a placeholder build pipeline (legacy)."""
-    builder = Builder()
-    result: LegacyBuildResult = builder.build(edits=[])
-    get_console().print(result)
-    success("Build complete (placeholder).")
 
 
 # ---------------------------------------------------------------------------

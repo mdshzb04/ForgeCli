@@ -24,7 +24,7 @@ from rich.table import Table
 
 from forgecli import __version__
 from forgecli.cli.ui import error, get_console, info, success, warn
-from forgecli.utils.paths import ProjectPaths
+from forgecli.utils.paths import ProjectPaths, to_privacy_path
 
 app = typer.Typer(help="Initialize a ForgeCLI project.", no_args_is_help=False)
 
@@ -140,7 +140,7 @@ def main(
     console.print(
         Panel(
             f"[bold cyan]ForgeCLI[/bold cyan] v{__version__}\n"
-            f"Project root: [dim]{target}[/dim]",
+            f"Project root: [dim]{to_privacy_path(target)}[/dim]",
             title="⚙  forge init",
             border_style="cyan",
             padding=(1, 2),
@@ -153,17 +153,17 @@ def main(
     dir_table.add_column("Purpose", style="cyan")
     dir_table.add_column("Path", style="dim")
     for label, p in dirs_created:
-        dir_table.add_row(label, str(p))
+        dir_table.add_row(label, to_privacy_path(p))
     console.print(dir_table)
     console.print()
 
     # Config
     if config_written:
-        success(f"Wrote config → {config_path}")
+        success(f"Wrote config → {to_privacy_path(config_path)}")
     else:
-        info(f"Config already exists at {config_path} (use --force to overwrite)")
+        info(f"Config already exists at {to_privacy_path(config_path)}. Suggest running with [bold cyan]--force[/bold cyan] if you want to overwrite it.")
     if env_written:
-        success(f"Wrote .env template → {env_path}")
+        success(f"Wrote .env template → {to_privacy_path(env_path)}")
     console.print()
 
     # Providers
@@ -189,8 +189,8 @@ def main(
             "  [cyan]forge ask \"How does auth work?\"[/cyan]               Ask about the codebase\n"
             "  [cyan]forge doctor[/cyan]                                  Self-check\n"
             "  [cyan]forge graph build[/cyan]                             Index the repo graph\n\n"
-            "[dim]All Ponytail prompt optimization is built-in — no extra install needed.\n"
-            "For Graphify repo intelligence, optionally install: uv tool install graphifyy[/dim]",
+            "[dim]✓ Ponytail prompt optimization is built-in.\n"
+            "✓ Graph intelligence is built-in (configure an LLM API key to enable semantic indexing).[/dim]",
             border_style="green",
             padding=(1, 2),
         )

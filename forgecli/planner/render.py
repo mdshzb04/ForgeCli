@@ -52,7 +52,7 @@ def render_plan(plan: SoftwarePlan) -> list:
     renderables.append(_render_milestones(plan))
     renderables.append(_render_tasks(plan))
     renderables.append(_render_risks(plan))
-    renderables.append(_render_prompt_sequences(plan))
+    renderables.extend(_render_prompt_sequences(plan))
     if plan.notes:
         renderables.append(_render_notes(plan))
     return renderables

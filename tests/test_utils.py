@@ -45,3 +45,22 @@ def test_aio_helpers_round_trip(tmp_path: Path) -> None:
     asyncio.run(aio_write_text(target, "data"))
     content = asyncio.run(aio_read_text(target))
     assert content == "data"
+
+
+def test_to_privacy_path() -> None:
+    from forgecli.utils.paths import to_privacy_path
+    
+    # Path inside home directory
+    home = Path.home().resolve()
+    target_path = home / "some_dir" / "some_file.txt"
+    formatted = to_privacy_path(target_path)
+    assert formatted.startswith("~/")
+    assert "some_dir" in formatted
+    
+    # Path outside home directory (e.g. root/tmp or something mock)
+    # On linux, /tmp is outside /home
+    formatted_outside = to_privacy_path("/opt/some_system_path")
+    assert not formatted_outside.startswith("~/")
+
+    # None path
+    assert to_privacy_path(None) == ""

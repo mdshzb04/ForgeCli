@@ -423,3 +423,20 @@ def test_suggestion_dataclass() -> None:
         category="security",
     )
     assert s.count == 0
+
+
+def test_render_findings_capping_and_grouping() -> None:
+    from forgecli.review.report import _render_findings
+
+    findings = [
+        Finding(rule_id=f"R{i}", category="security", severity=Severity.HIGH, message="msg")
+        for i in range(12)
+    ]
+    # Under 10 by default
+    group_default = _render_findings(findings, full=False)
+    header_panel = group_default.renderables[0]
+    assert "Top 10" in str(header_panel.renderable)
+    
+    group_full = _render_findings(findings, full=True)
+    header_panel_full = group_full.renderables[0]
+    assert "Findings" in str(header_panel_full.renderable)

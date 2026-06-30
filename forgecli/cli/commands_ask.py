@@ -13,7 +13,7 @@ from typing import Optional
 
 import typer
 
-from forgecli.cli.ui import error, get_console
+from forgecli.cli.ui import error, get_console, info, warn
 from forgecli.orchestrator import (
     AskWorkflow,
     HeuristicIntentClassifier,
@@ -21,6 +21,7 @@ from forgecli.orchestrator import (
     PluginRegistry,
 )
 from forgecli.providers.mock import MockProvider, MockProviderConfig
+from forgecli.utils.paths import to_privacy_path
 
 app = typer.Typer(
     help="Ask a question about the repository (uses Graphify + Ponytail + LLM).",
@@ -76,12 +77,43 @@ async def _run_ask(question: str, path: Path, live: bool) -> None:
     registry.register_classifier(HeuristicIntentClassifier())
     registry.register_workflow(AskWorkflow())
     orchestrator = Orchestrator(registry, provider=provider)
-    result = await orchestrator.run(question)
-    if not result.success:
-        error(result.error or "Ask workflow failed.")
-        raise typer.Exit(code=1)
-    get_console().print()
-    get_console().print(result.summary or "(no answer)")
+
+    try:
+        if isinstance(provider, MockProvider):
+            raise ValueError("No live provider configured")
+
+        result = await orchestrator.run(question)
+        if not result.success:
+            raise Exception(result.error or "Orchestrator failed")
+
+        get_console().print()
+        get_console().print(result.summary or "(no answer)")
+    except Exception as exc:
+        # Fall back to local Graphify index
+        from forgecli.graph.backend_graphify import GraphifyRepositoryGraph
+        backend = GraphifyRepositoryGraph(root=path)
+
+        if await backend.is_available() and backend.artifacts.graph_json.exists():
+            warn(f"Live provider could not be used ({exc}). Falling back to local Graphify index.")
+            try:
+                info("Searching local Graphify index for answers...")
+                query_result = await backend.query(question)
+                get_console().print()
+                info("┌────────────────────────────────────────────────────────────┐")
+                info("│ 🕸  Response sourced directly from local Graphify index     │")
+                info("└────────────────────────────────────────────────────────────┘")
+                get_console().print(query_result.answer or "(no answer found in graph)")
+            except Exception as e:
+                error(f"Failed to query local Graphify index: {e}")
+                raise typer.Exit(code=1) from e
+        else:
+            warn(
+                f"Live provider could not be used ({exc}) and no local Graphify index is available.\n"
+                "To get answers, please set a valid API key (e.g. export OPENAI_API_KEY='...') or build a local graph index:\n"
+                f"  - uv tool install graphifyy\n"
+                f"  - forge graph build --path {to_privacy_path(path)}"
+            )
+            raise typer.Exit(code=1) from exc
 
 
 __all__ = ["app"]

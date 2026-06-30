@@ -12,6 +12,7 @@ from rich.table import Table
 from forgecli.review.finding import Finding, Severity
 from forgecli.review.repository import RepositoryReview
 from forgecli.review.suggestions import Suggestion
+from forgecli.utils.paths import to_privacy_path
 
 _SEVERITY_STYLE: dict[Severity, str] = {
     Severity.INFO: "cyan",
@@ -22,14 +23,19 @@ _SEVERITY_STYLE: dict[Severity, str] = {
 }
 
 
-def print_review(review: RepositoryReview, console: Console | None = None) -> None:
+def print_review(
+    review: RepositoryReview,
+    console: Console | None = None,
+    *,
+    full: bool = False,
+) -> None:
     """Print a :class:`RepositoryReview` using the given Rich console."""
     console = console or Console()
-    for renderable in render_review(review):
+    for renderable in render_review(review, full=full):
         console.print(renderable)
 
 
-def render_review(review: RepositoryReview) -> list:
+def render_review(review: RepositoryReview, *, full: bool = False) -> list:
     """Return a list of Rich renderables that visualize ``review``."""
     out: list = []
     out.append(_render_header(review))
@@ -37,7 +43,7 @@ def render_review(review: RepositoryReview) -> list:
     if review.suggestions:
         out.append(_render_suggestions(review.suggestions))
     if review.findings:
-        out.append(_render_findings(review.findings))
+        out.append(_render_findings(review.findings, full=full))
     if not review.findings:
         out.append(Panel("[green]No findings.[/green]", border_style="green"))
     return out
@@ -56,7 +62,7 @@ def review_to_json(review: RepositoryReview, *, indent: int = 2) -> str:
 def review_to_markdown(review: RepositoryReview) -> str:
     """Return a Markdown rendering of ``review``."""
     parts: list[str] = []
-    parts.append(f"# Review: {review.root}\n")
+    parts.append(f"# Review: {to_privacy_path(review.root)}\n")
     counts = review.counts_by_severity()
     parts.append("## Summary")
     parts.append("")
@@ -91,7 +97,7 @@ def review_to_markdown(review: RepositoryReview) -> str:
                     sev=finding.severity.value,
                     cat=finding.category,
                     rule=finding.rule_id,
-                    path=_shorten_path(finding.path) if finding.path else "",
+                    path=_shorten_path(to_privacy_path(finding.path)) if finding.path else "",
                     line=finding.line or "",
                     msg=_escape(finding.message),
                 )
@@ -110,7 +116,7 @@ def _render_header(review: RepositoryReview) -> Panel:
     counts = review.counts_by_severity()
     critical = counts[Severity.CRITICAL]
     high = counts[Severity.HIGH]
-    title_text = f"[bold]Code review:[/bold] {review.root}"
+    title_text = f"[bold]Code review:[/bold] {to_privacy_path(review.root)}"
     if critical:
         title_text += f"  [critical on red] {critical} critical [/]"
     if high:
@@ -193,43 +199,64 @@ def _render_suggestions(suggestions: Iterable[Suggestion]) -> Panel:
     return Panel(table, title="Suggestions", border_style="cyan")
 
 
-def _render_findings(findings: Iterable[Finding]) -> Panel:
-    by_category: dict[str, list[Finding]] = {}
-    for finding in findings:
-        by_category.setdefault(finding.category, []).append(finding)
+def _render_findings(findings: Iterable[Finding], *, full: bool = False) -> Group:
+    # 1. Sort by severity weight descending
+    sorted_findings = sorted(findings, key=lambda f: f.severity.weight, reverse=True)
+
+    # 2. Slice to Top 10 if not full
+    capping_msg = ""
+    if not full and len(sorted_findings) > 10:
+        capping_msg = f" (Top 10 of {len(sorted_findings)} findings shown. Use --full for all)"
+        displayed_findings = sorted_findings[:10]
+    else:
+        displayed_findings = sorted_findings
+
+    # 3. Group by severity and then category
+    by_severity: dict[Severity, dict[str, list[Finding]]] = {}
+    for finding in displayed_findings:
+        by_severity.setdefault(finding.severity, {}).setdefault(finding.category, []).append(finding)
 
     panels: list = []
-    for category in sorted(by_category):
-        rows = by_category[category]
-        table = Table(
-            title=f"{category} ({len(rows)})",
-            title_style="bold cyan",
-            header_style="bold magenta",
-            show_lines=True,
-            expand=True,
-        )
-        table.add_column("Sev", no_wrap=True)
-        table.add_column("Rule", no_wrap=True)
-        table.add_column("Path:Line", no_wrap=True)
-        table.add_column("Message", overflow="fold")
-        table.add_column("Suggestion", overflow="fold", style="muted")
-        for finding in rows:
-            location = (
-                f"{_shorten_path(finding.path)}:{finding.line}"
-                if finding.path and finding.line
-                else finding.path or ""
+    # Loop over severity in order of weight descending
+    for severity in sorted(by_severity.keys(), key=lambda s: s.weight, reverse=True):
+        sev_style = _SEVERITY_STYLE.get(severity, "white")
+        panels.append(TextRenderable(f"\n[bold {sev_style}]▲ {severity.value.upper()} FINDINGS[/bold {sev_style}]"))
+
+        by_cat = by_severity[severity]
+        for category in sorted(by_cat.keys()):
+            rows = by_cat[category]
+            table = Table(
+                title=f"{category.capitalize()} ({len(rows)})",
+                title_style="bold cyan",
+                header_style="bold magenta",
+                show_lines=True,
+                expand=True,
             )
-            table.add_row(
-                TextRenderable(
-                    finding.severity.value, style=_SEVERITY_STYLE[finding.severity]
-                ),
-                finding.rule_id,
-                location,
-                finding.message,
-                finding.suggestion or "",
-            )
-        panels.append(table)
-    return Panel(Group(*panels), title="Findings", border_style="cyan")
+            table.add_column("Rule", no_wrap=True)
+            table.add_column("Path:Line", overflow="fold")
+            table.add_column("Message", overflow="fold")
+            table.add_column("Suggestion", overflow="fold", style="muted")
+
+            for finding in rows:
+                sanitized_path = to_privacy_path(finding.path) if finding.path else ""
+                location = (
+                    f"{_shorten_path(sanitized_path)}:{finding.line}"
+                    if sanitized_path and finding.line
+                    else sanitized_path
+                )
+                table.add_row(
+                    finding.rule_id,
+                    location,
+                    finding.message,
+                    finding.suggestion or "",
+                )
+            panels.append(table)
+
+    header = Panel(
+        TextRenderable(f"[bold cyan]Findings{capping_msg}[/bold cyan]"),
+        border_style="cyan",
+    )
+    return Group(header, *panels)
 
 
 # ---------------------------------------------------------------------------

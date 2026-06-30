@@ -14,6 +14,9 @@ def configure_logging(level: str = "INFO") -> None:
     """Configure root logging once for the lifetime of the process."""
     global _configured
     if _configured:
+        new_level = _coerce_level(level)
+        if logging.getLogger().level != logging.DEBUG or new_level == logging.DEBUG:
+            logging.getLogger().setLevel(new_level)
         return
 
     handler = logging.StreamHandler(stream=sys.stderr)

@@ -289,6 +289,20 @@ def test_check_for_update_handles_network_error(monkeypatch, tmp_path: Path) -> 
     assert info.update_available is False
 
 
+def test_check_for_update_graceful_offline_fallback(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("FORGECLI_DATA_DIR", str(tmp_path))
+    _write_cache("9.9.9")
+    monkeypatch.setenv("FORGECLI_UPDATE_CACHE_TTL", "0")
+
+    def boom():
+        raise OSError("offline")
+
+    info = check_for_update(client_factory=boom)
+    assert info.latest == "9.9.9"
+    assert info.update_available is True
+    assert "Offline fallback" in (info.error or "")
+
+
 def test_check_for_update_uses_cache(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("FORGECLI_DATA_DIR", str(tmp_path))
     _write_cache("9.9.9")

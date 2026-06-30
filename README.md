@@ -118,41 +118,55 @@ Environment variables are documented in [`.env.example`](.env.example).
 
 ---
 
-## Commands (scaffold)
+## Commands
 
 | Command                    | Description                                              |
 | -------------------------- | -------------------------------------------------------- |
 | `forge init`               | Initialize a ForgeCLI project                            |
 | `forge config`             | Show / validate configuration                            |
 | `forge providers list`     | List registered AI providers                             |
-| `forge model claude`       | Use Anthropic Claude as the active provider              |
-| `forge model openai`       | Use OpenAI as the active provider                        |
-| `forge model gemini`       | Use Google Gemini as the active provider                 |
-| `forge model auto`         | Auto-select the cheapest provider with creds             |
 | `forge model status`       | Show current selection, costs, and credentials           |
 | `forge model list`         | List all registered providers and their defaults         |
+| `forge model preview`      | Print the routing decision the current selection would make |
+| `forge model auto`         | Auto-select the cheapest provider with creds             |
+| `forge model openai`       | Use OpenAI as the active provider                        |
+| `forge model anthropic`    | Use Anthropic Claude as the active provider              |
+| `forge model gemini`       | Use Google Gemini as the active provider                 |
 | `forge index`              | Build the in-memory code graph (lightweight)             |
 | `forge graph build`        | Build the Graphify knowledge graph for a project         |
 | `forge graph status`       | Show whether Graphify is installed and graph.json exists |
-| `forge graph query "..."`  | BFS/DFS-traverse the graph with a free-form question     |
+| `forge graph query "..."`  | BFS/DFS-traverse the graph with a query or question      |
 | `forge graph explain X`    | Explain a node and its neighbors (text from Graphify)    |
 | `forge graph path A B`     | Shortest edge path between two nodes                     |
 | `forge graph affected X`   | Reverse-traverse to find blast radius of a node          |
-| `forge optimizer on/off`   | Turn the Ponytail prompt optimizer on/off                |
-| `forge optimizer lite|full|ultra` | Set the Ponytail intensity                       |
-| `forge optimizer status`   | Show current intensity, backend, and binary path          |
-| `forge optimizer preview`  | Show what would be prepended to a system message          |
+| `forge graph open`         | Open interactive graph visualization in web browser      |
+| `forge optimizer on`       | Turn the Ponytail prompt optimizer on                    |
+| `forge optimizer off`      | Turn the Ponytail prompt optimizer off                   |
+| `forge optimizer status`   | Show current intensity, backend, and binary path         |
+| `forge optimizer preview`  | Show what would be prepended to a system message         |
+| `forge optimizer set`      | Manually configure Ponytail intensity and backend        |
 | `forge explain X`          | Top-level alias for `forge graph explain X`              |
-| `forge plan <goal>`        | Build a software plan (architecture, milestones, tasks, risks, prompts) |
-| `forge review`             | Run a code-quality review (security, performance, architecture, complexity, dead code, duplicates) |
-| `forge commit`             | Analyze the git diff, generate a semantic commit + changelog entry, optional push |
-| `forge build`              | Run the builder pipeline                                 |
-| `forge review`             | Review code changes                                      |
+| `forge plan <goal>`        | Build a software plan (architecture, milestones, tasks, risks) |
+| `forge review`             | Run a code-quality review (security, performance, architecture, etc.) |
+| `forge commit`             | Generate a conventional commit + changelog entry        |
+| `forge commit release`     | Promote unreleased changelog entries to versioned block  |
+| `forge build`              | Run the builder pipeline on a natural-language prompt    |
 | `forge git`                | Inspect / operate on the git repository                  |
-| `forge history`            | Show recent CLI history                                  |
+| `forge history`            | Show recent CLI command history                          |
+| `forge docs`               | Automatically generate project markdown documentation    |
+| `forge release`            | Cut a release (changelog, tag, commit, push)             |
+| `forge doctor`             | Run diagnostic checks on external dependencies           |
+| `forge info`               | Print active workspace and framework details             |
+| `forge update`             | Check for package updates on PyPI                        |
+| `forge plugin`             | Inspect registered third-party plugins                   |
 
 Every command is wired through the shared `AppContext` and supports
 `--config <path>`, `--verbose`, and `--version` global flags.
+
+### Prerequisites & Caveats
+
+- **Git Dependency**: ForgeCLI relies on `git` for commit analysis, conventional commits, changelog generation, and tag-push automation. Ensure you have `git` installed and initialized.
+- **Graphify Backend**: The `forge graph` features require the external `graphify` CLI command to be installed globally on your machine (e.g., via `uv tool install graphifyy` or similar package managers). ForgeCLI runs the command in a subprocess and will gracefully hint installation instructions if it's missing.
 
 ---
 
@@ -653,4 +667,3 @@ Python 3.12 and 3.13. See :file:`.github/workflows/ci.yml`.
 ## License
 
 [MIT](LICENSE)
-# ForgeCli

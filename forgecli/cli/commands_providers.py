@@ -13,7 +13,7 @@ app = typer.Typer(help="Manage AI providers.", no_args_is_help=True)
 
 @app.command("list")
 def list_cmd() -> None:
-    """List registered providers (placeholder)."""
+    """List registered providers."""
     context = bootstrap_context()
     registry = context.container.resolve(ProviderRegistry)
     table(

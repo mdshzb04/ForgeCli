@@ -87,3 +87,23 @@ def test_init_does_not_overwrite_existing_unless_forced(tmp_path: Path, monkeypa
     assert result_forced.exit_code == 0
     assert "Wrote config" in result_forced.output
     assert "[app]" in config_file.read_text(encoding="utf-8")
+
+
+def test_init_onboarding_copy(tmp_path: Path, monkeypatch) -> None:
+    config_dir = tmp_path / "config"
+    data_dir = tmp_path / "data"
+    monkeypatch.setenv("FORGECLI_CONFIG_DIR", str(config_dir))
+    monkeypatch.setenv("FORGECLI_DATA_DIR", str(data_dir))
+
+    project_root = tmp_path / "onboarding_project"
+    project_root.mkdir()
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["init", "--path", str(project_root)])
+    assert result.exit_code == 0
+    assert "✓ Ponytail prompt optimization is built-in." in result.output
+    assert "✓ Graph intelligence is built-in" in result.output
+    assert "configure an LLM API key" in result.output
+    assert "semantic indexing" in result.output
+    assert "uv tool install graphifyy" not in result.output
+

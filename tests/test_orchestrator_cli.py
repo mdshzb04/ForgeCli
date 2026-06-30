@@ -136,5 +136,25 @@ def test_plugin_registry_can_register_custom_workflow() -> None:
     assert any(w.name == "custom" for w in registry.workflows)
 
 
+def test_cli_build_option_after_positional(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("FORGECLI_DATA_DIR", str(tmp_path))
+    runner = CliRunner()
+    # Mocking _run_build so we don't execute the entire pipeline
+    with patch("forgecli.cli.commands_build._run_build", return_value=None) as mock_run:
+        result = runner.invoke(app, ["build", "My build prompt", "--no-tests"])
+    assert result.exit_code == 0
+    mock_run.assert_called_once()
+    assert mock_run.call_args[1]["no_tests"] is True
+
+
+def test_cli_release_option_after_positional(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("FORGECLI_DATA_DIR", str(tmp_path))
+    runner = CliRunner()
+    result = runner.invoke(app, ["release", "1.0.0", "--dry-run"])
+    # Should not fail with click argument parsing errors (Missing argument 'VERSION')
+    # Because there is no changelog, it should exit 1 (warns no unreleased entries), but the exit code must not be click parse error (which is 2).
+    assert result.exit_code == 1
+
+
 # Silence unused-import warnings.
 _ = subprocess

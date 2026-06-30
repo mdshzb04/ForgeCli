@@ -144,6 +144,8 @@ def preview_cmd() -> None:
     state = _load(context.paths)
     router = _build_router(context)
     decision = router.select(state.choice)
+    if state.model:
+        decision = _apply_model_override(decision, state.model)
     get_console().print(decision)
 
 

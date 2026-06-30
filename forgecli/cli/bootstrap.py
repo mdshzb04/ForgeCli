@@ -32,8 +32,21 @@ def bootstrap_context(
     extras: dict[str, Any] | None = None,
 ) -> AppContext:
     """Build an :class:`AppContext` with default services registered."""
+    import click
+    try:
+        click_ctx = click.get_current_context(silent=True)
+    except Exception:
+        click_ctx = None
+
+    if click_ctx is not None and click_ctx.obj is not None:
+        if isinstance(click_ctx.obj, AppContext):
+            return click_ctx.obj
+
     paths = ProjectPaths.from_env(cwd=cwd).ensure()
-    configure_logging()
+
+    verbose = (extras or {}).get("verbose", False)
+    level = "DEBUG" if verbose else "INFO"
+    configure_logging(level=level)
 
     loader = ConfigLoader(config_path) if config_path else ConfigLoader()
 
@@ -58,6 +71,8 @@ def bootstrap_context(
         load_router_state(paths.data_dir / "router.json"),
     )
     context.extras.update(merged)
+    if click_ctx is not None:
+        click_ctx.obj = context
     return context
 
 

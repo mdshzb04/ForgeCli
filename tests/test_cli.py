@@ -94,3 +94,44 @@ def test_cli_graph_open_success(tmp_path: Path, monkeypatch) -> None:
     assert "Opening interactive graph" in result.output
     assert "Interactive graph launched" in result.output
     assert len(called_open) == 1
+
+
+def test_cli_records_history(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("FORGECLI_DATA_DIR", str(tmp_path))
+    runner = CliRunner()
+    result = runner.invoke(app, ["status"])
+    assert result.exit_code == 0
+    result_history = runner.invoke(app, ["history", "list"])
+    assert result_history.exit_code == 0
+    assert "status" in result_history.output
+
+
+def test_cli_verbose_logging(monkeypatch, tmp_path: Path) -> None:
+    import logging
+    monkeypatch.setenv("FORGECLI_DATA_DIR", str(tmp_path))
+    # Reset logger configuration so it configures anew
+    from forgecli.core import logging as forge_logging
+    old_configured = forge_logging._configured
+    old_level = logging.getLogger().level
+    forge_logging._configured = False
+
+    try:
+        runner = CliRunner()
+        result = runner.invoke(app, ["--verbose", "status"])
+        assert result.exit_code == 0
+        assert logging.getLogger().level == logging.DEBUG
+    finally:
+        forge_logging._configured = old_configured
+        logging.getLogger().setLevel(old_level)
+
+
+def test_cli_doctor_output() -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["doctor"])
+    assert result.exit_code == 0
+    assert "Overall Health" in result.output
+    assert "Weighted Category Breakdown" in result.output
+    assert "Deductions & Actionable Next Steps" in result.output
+
+
+
