@@ -75,14 +75,30 @@ class OpenAIProvider(HTTPChatProvider):
             "model": request.model or self.config.default_model,
             "messages": messages_to_openai(request.messages),
         }
-        if request.temperature is not None:
-            body["temperature"] = request.temperature
+        model_lower = (request.model or self.config.default_model).lower()
+        is_reasoning_or_gpt5 = (
+            model_lower.startswith("o1")
+            or model_lower.startswith("o3")
+            or "gpt-5" in model_lower
+        )
+        is_pure_reasoning = (
+            model_lower.startswith("o1")
+            or model_lower.startswith("o3")
+            or "gpt-5" in model_lower
+        )
+
+        if not is_pure_reasoning:
+            if request.temperature is not None:
+                body["temperature"] = request.temperature
+            else:
+                body["temperature"] = self.config.temperature
+
+        max_tokens_val = request.max_tokens if request.max_tokens is not None else self.config.max_tokens
+        if is_reasoning_or_gpt5:
+            body["max_completion_tokens"] = max_tokens_val
         else:
-            body["temperature"] = self.config.temperature
-        if request.max_tokens is not None:
-            body["max_tokens"] = request.max_tokens
-        else:
-            body["max_tokens"] = self.config.max_tokens
+            body["max_tokens"] = max_tokens_val
+
         if request.top_p is not None:
             body["top_p"] = request.top_p
         if request.stop:

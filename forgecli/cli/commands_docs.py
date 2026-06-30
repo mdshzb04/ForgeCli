@@ -70,7 +70,7 @@ async def _run_docs(path: Path, output: Path | None, live: bool) -> None:
             get_console().print(f"  [muted]{target}[/muted]")
         except Exception as e:
             error(f"Failed to generate docs: {e}")
-            raise typer.Exit(code=1) from e
+            raise typer.Exit(code=1) from None
 
 
 __all__ = ["app"]

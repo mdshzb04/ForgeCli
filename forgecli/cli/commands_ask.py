@@ -65,7 +65,7 @@ async def _run_ask(question: str, path: Path, live: bool) -> None:
         get_console().print(result.summary or "(no answer)")
     except Exception as exc:
         error(f"Failed to get answer from provider: {exc}")
-        raise typer.Exit(code=1) from exc
+        raise typer.Exit(code=1) from None
 
 
 __all__ = ["app"]
