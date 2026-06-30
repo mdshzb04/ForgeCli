@@ -193,6 +193,9 @@ class GeminiProvider(HTTPChatProvider):
 
     def _known_models(self) -> list[ModelInfo]:
         return [
+            ModelInfo(id="gemini-2.5-pro", context_window=2_000_000, supports_tools=True, supports_vision=True),
+            ModelInfo(id="gemini-2.5-flash", context_window=2_000_000, supports_tools=True, supports_vision=True),
+            ModelInfo(id="gemini-2.5-flash-lite", context_window=1_000_000, supports_tools=True, supports_vision=True),
             ModelInfo(id="gemini-1.5-pro", context_window=2_000_000, supports_tools=True, supports_vision=True),
             ModelInfo(id="gemini-1.5-flash", context_window=1_000_000, supports_tools=True, supports_vision=True),
             ModelInfo(id="gemini-2.0-flash-exp", context_window=1_000_000, supports_tools=True, supports_vision=True),
@@ -200,10 +203,13 @@ class GeminiProvider(HTTPChatProvider):
 
 
 def _fallback_api_key(primary: str) -> str | None:
-    """Read ``primary`` or ``GEMINI_API_KEY`` from the environment."""
+    """Read ``primary`` or ``GEMINI_API_KEY`` from the environment, or secure storage."""
     import os
-
-    return os.environ.get(primary) or os.environ.get("GEMINI_API_KEY")
+    env_val = os.environ.get(primary) or os.environ.get("GEMINI_API_KEY")
+    if env_val:
+        return env_val
+    from forgecli.core.credentials import get_api_key
+    return get_api_key("google") or get_api_key("gemini")
 
 
 __all__ = ["GeminiConfig", "GeminiProvider"]

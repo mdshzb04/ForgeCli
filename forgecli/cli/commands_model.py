@@ -1,228 +1,297 @@
-"""``forge model`` subcommand group: choose an AI provider/model.
-
-The selected choice is persisted to ``data_dir/router.json`` and read
-back on every subsequent CLI invocation. ``auto`` defers to the
-cheapest-compatible provider with credentials available.
-"""
+"""``forge model`` subcommand group: choose and manage AI models."""
 
 from __future__ import annotations
 
-import os
-from pathlib import Path
+import asyncio
 
 import typer
 
 from forgecli.cli.bootstrap import bootstrap_context
-from forgecli.cli.ui import get_console, success, table, warn
+from forgecli.cli.ui import get_console
 from forgecli.providers.base import ProviderRegistry
-from forgecli.providers.router import (
-    ModelRouter,
-    SelectionMode,
-)
-from forgecli.providers.router_state import (
-    RouterState,
-    load_state,
-    save_state,
-)
 
 app = typer.Typer(
-    help="Choose the AI provider/model for this project (claude, openai, gemini, auto).",
+    help="Manage AI models and aliases.",
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
 
+MODEL_DISPLAY_NAMES = {
+    # OpenAI
+    "gpt-5": "GPT-5",
+    "gpt-5-mini": "GPT-5 Mini",
+    "gpt-4.1": "GPT-4.1",
+    "gpt-4.1-mini": "GPT-4.1 Mini",
+    "gpt-4o": "GPT-4o",
+    "gpt-4o-mini": "GPT-4o Mini",
+    "gpt-4-turbo": "GPT-4 Turbo",
+    "o1-preview": "o1 Preview",
+    "o1-mini": "o1 Mini",
+    # Anthropic
+    "claude-opus-4.1": "Claude Opus 4.1",
+    "claude-sonnet-4.5": "Claude Sonnet 4.5",
+    "claude-haiku-4.5": "Claude Haiku 4.5",
+    "claude-3-5-sonnet-latest": "Claude 3.5 Sonnet",
+    "claude-3-5-haiku-latest": "Claude 3.5 Haiku",
+    "claude-3-opus-latest": "Claude 3 Opus",
+    # Google
+    "gemini-2.5-pro": "Gemini 2.5 Pro",
+    "gemini-2.5-flash": "Gemini 2.5 Flash",
+    "gemini-2.5-flash-lite": "Gemini 2.5 Flash Lite",
+    "gemini-1.5-pro": "Gemini 1.5 Pro",
+    "gemini-1.5-flash": "Gemini 1.5 Flash",
+    "gemini-2.0-flash-exp": "Gemini 2.0 Flash Exp",
+    # OpenRouter
+    "glm-5.2": "GLM 5.2",
+    "deepseek-v3": "DeepSeek V3",
+    "deepseek-r1": "DeepSeek R1",
+    "qwen3-coder": "Qwen3 Coder",
+    "qwen3-32b": "Qwen3 32B",
+    "kimi-k2": "Kimi K2",
+    "llama-4-maverick": "Llama 4 Maverick",
+    "llama-3.3-70b": "Llama 3.3 70B",
+    "gemma-3": "Gemma 3",
+    "devstral": "Devstral",
+    "codestral": "Codestral",
+    # Groq
+    "llama-4-scout": "Llama 4 Scout",
+    # Mistral
+    "mistral-large": "Mistral Large",
+    "magistral": "Magistral",
+    "mistral-small": "Mistral Small",
+    # Local
+    "llama3": "Llama 3",
+    "local-model": "Local Model",
+}
 
-_STATE_FILE = "router.json"
-
-
-def _state_path(paths) -> Path:
-    return paths.data_dir / _STATE_FILE
-
-
-def _load(paths) -> RouterState:
-    return load_state(_state_path(paths))
-
-
-def _save(paths, state: RouterState) -> None:
-    save_state(_state_path(paths), state)
-
-
-def _build_router(context) -> ModelRouter:
-    registry = context.container.resolve(ProviderRegistry)
-    return ModelRouter(registry=registry)
-
-
-# ---------------------------------------------------------------------------
-# Commands
-# ---------------------------------------------------------------------------
-
-
-@app.command("claude")
-def claude_cmd(
-    model: str | None = typer.Option(
-        None, "--model", "-m", help="Override the Anthropic model (e.g. claude-3-5-sonnet-latest)."
-    ),
-) -> None:
-    """Use Anthropic Claude as the active provider."""
-    _select("claude", model_override=model, provider_override="anthropic")
-
-
-@app.command("openai")
-def openai_cmd(
-    model: str | None = typer.Option(
-        None, "--model", "-m", help="Override the OpenAI model (e.g. gpt-4o-mini)."
-    ),
-) -> None:
-    """Use OpenAI as the active provider."""
-    _select("openai", model_override=model, provider_override="openai")
-
-
-@app.command("gemini")
-def gemini_cmd(
-    model: str | None = typer.Option(
-        None, "--model", "-m", help="Override the Google model (e.g. gemini-1.5-flash)."
-    ),
-) -> None:
-    """Use Google Gemini as the active provider."""
-    _select("gemini", model_override=model, provider_override="google")
-
-
-@app.command("auto")
-def auto_cmd() -> None:
-    """Auto-select the cheapest compatible provider with credentials available."""
-    _select("auto", model_override=None, provider_override=None)
-
-
-@app.command("status")
-def status_cmd() -> None:
-    """Show the currently active selection and what it would route to."""
-    context = bootstrap_context()
-    state = _load(context.paths)
-    router = _build_router(context)
-    decision = router.select(state.choice)
-    if state.model:
-        decision = _apply_model_override(decision, state.model)
-    creds = _env_summary()
-    rows = [
-        ["choice", state.choice],
-        ["model", decision.model],
-        ["provider", decision.provider_name],
-        ["mode", decision.mode.value],
-        ["cost in / out (per 1k tokens)", f"${decision.cost_in:.5f} / ${decision.cost_out:.5f}"],
-        ["state file", str(_state_path(context.paths))],
-    ]
-    table(["Field", "Value"], rows, title="Model router")
-    get_console().print()
-    table(
-        ["Provider", "API key env", "Available"],
-        creds,
-        title="Credentials detected",
-    )
+STATIC_GROUPS = {
+    "OpenAI": [
+        "gpt-5",
+        "gpt-5-mini",
+        "gpt-4.1",
+        "gpt-4.1-mini",
+        "gpt-4o",
+        "gpt-4o-mini",
+        "gpt-4-turbo",
+        "o1-preview",
+        "o1-mini",
+    ],
+    "Anthropic": [
+        "claude-opus-4.1",
+        "claude-sonnet-4.5",
+        "claude-haiku-4.5",
+        "claude-3-5-sonnet-latest",
+        "claude-3-5-haiku-latest",
+        "claude-3-opus-latest",
+    ],
+    "Google": [
+        "gemini-2.5-pro",
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-1.5-pro",
+        "gemini-1.5-flash",
+        "gemini-2.0-flash-exp",
+    ],
+    "OpenRouter": [
+        "glm-5.2",
+        "deepseek-v3",
+        "deepseek-r1",
+        "qwen3-coder",
+        "qwen3-32b",
+        "kimi-k2",
+        "llama-4-maverick",
+        "llama-3.3-70b",
+        "gemma-3",
+        "devstral",
+        "codestral",
+    ],
+    "Groq": ["llama-4-scout", "deepseek-r1", "qwen3-32b"],
+    "Mistral": ["mistral-large", "magistral", "mistral-small"],
+}
 
 
 @app.command("list")
 def list_cmd() -> None:
-    """List every registered provider and its default model."""
-    context = bootstrap_context()
-    router = _build_router(context)
-    rows = []
-    for name in router.available_providers():
-        rows.append(
-            [
-                name,
-                router.default_model_for(name),
-                "yes" if _provider_has_credentials(name) else "no",
-            ]
-        )
-    table(["Provider", "Default model", "Credentials"], rows, title="Registered providers")
+    """List every registered provider and its supported models."""
+    console = get_console()
 
+    # Print static groups
+    for group_name, models in STATIC_GROUPS.items():
+        console.print(f"\n[bold]{group_name}[/bold]")
+        console.print("-" * 40)
+        for m in models:
+            disp = MODEL_DISPLAY_NAMES.get(m, m)
+            console.print(f"  {disp}")
 
-@app.command("preview")
-def preview_cmd() -> None:
-    """Print the routing decision the current selection would make."""
-    context = bootstrap_context()
-    state = _load(context.paths)
-    router = _build_router(context)
-    decision = router.select(state.choice)
-    if state.model:
-        decision = _apply_model_override(decision, state.model)
-    get_console().print(decision)
+    # Query local/dynamic models
+    console.print("\n[bold]Local Providers[/bold]")
+    console.print("-" * 40)
 
-
-# ---------------------------------------------------------------------------
-# Internal
-# ---------------------------------------------------------------------------
-
-
-def _select(choice: str, *, model_override: str | None, provider_override: str | None) -> None:
-    context = bootstrap_context()
-    state = _load(context.paths)
-    state.choice = choice
-    if model_override:
-        state.model = model_override
-    if provider_override:
-        state.provider = provider_override
-    _save(context.paths, state)
-    context.extras.update(state.to_extras())
-
-    router = _build_router(context)
-    decision = router.select(choice)
-    if state.model:
-        decision = _apply_model_override(decision, state.model)
-    lines = [
-        f"Active: [accent]{decision.provider_name}[/accent] / [bold]{decision.model}[/bold]",
-        f"Mode:   {decision.mode.value}",
-    ]
-    if decision.mode is SelectionMode.FALLBACK:
-        warn(
-            "No provider had credentials available; the router fell back to the mock provider."
-        )
-    else:
-        success(
-            f"Switched to {decision.provider_name} ({decision.model}) — "
-            f"${decision.cost_in:.5f}/1k in, ${decision.cost_out:.5f}/1k out."
-        )
-    for line in lines:
-        get_console().print(line)
-
-
-def _apply_model_override(decision, model: str):  # type: ignore[no-untyped-def]
-    from forgecli.providers.router import RouteDecision, SelectionMode
-
-    return RouteDecision(
-        provider_name=decision.provider_name,
-        model=model,
-        mode=SelectionMode.EXPLICIT,
-        cost_in=decision.cost_in,
-        cost_out=decision.cost_out,
-        candidates=decision.candidates,
+    from forgecli.providers.openai_compatible import (
+        LMStudioProvider,
+        OllamaProvider,
+        VllmProvider,
     )
 
+    locals_map = {
+        "Ollama": (OllamaProvider, "ollama"),
+        "LM Studio": (LMStudioProvider, "lmstudio"),
+        "vLLM": (VllmProvider, "vllm"),
+    }
 
-def _provider_has_credentials(name: str) -> bool:
-    env_vars = {
-        "openai": ("OPENAI_API_KEY",),
-        "anthropic": ("ANTHROPIC_API_KEY",),
-        "google": ("GOOGLE_API_KEY", "GEMINI_API_KEY"),
-        "mock": (),
-    }.get(name, ())
-    if name == "mock":
-        return True
-    return any(os.environ.get(v) for v in env_vars)
+    for name, (cls, _) in locals_map.items():
+        console.print(f"\n  [bold]{name}[/bold]")
+        try:
+            p_inst = cls()
+            dynamic_models = asyncio.run(p_inst.list_models())
+            if dynamic_models:
+                for dm in dynamic_models:
+                    console.print(f"    {dm.id}")
+            else:
+                for sm in p_inst._known_models():
+                    console.print(f"    {sm.id}")
+        except Exception:
+            p_inst = cls()
+            for sm in p_inst._known_models():
+                console.print(f"    {sm.id}")
 
 
-def _env_summary() -> list[list[str]]:
-    rows: list[list[str]] = []
-    for provider, env_vars in {
-        "openai": ("OPENAI_API_KEY",),
-        "anthropic": ("ANTHROPIC_API_KEY",),
-        "google": ("GOOGLE_API_KEY", "GEMINI_API_KEY"),
-    }.items():
-        present = [v for v in env_vars if os.environ.get(v)]
-        rows.append(
-            [provider, ", ".join(env_vars), "yes" if present else "no"]
-        )
-    return rows
+@app.command("use")
+def use(
+    model: str = typer.Argument(..., help="The model ID or alias to set as default.")
+) -> None:
+    """Set the default model and automatically update its provider."""
+    console = get_console()
+    model_lower = model.lower().strip()
+
+    found_provider = None
+    display_model = MODEL_DISPLAY_NAMES.get(model_lower, model)
+
+    for provider, models in STATIC_GROUPS.items():
+        if model_lower in models or any(m.lower() == model_lower for m in models):
+            found_provider = provider.lower()
+            for m in models:
+                if m.lower() == model_lower:
+                    model_lower = m
+                    display_model = MODEL_DISPLAY_NAMES.get(m, m)
+                    break
+            break
+
+    if not found_provider:
+        if model_lower == "llama3":
+            found_provider = "ollama"
+        elif model_lower == "local-model":
+            found_provider = "lmstudio"
+        else:
+            from forgecli.config.loader import ConfigLoader
+
+            try:
+                settings = ConfigLoader().load()
+                found_provider = settings.providers.default
+            except Exception:
+                found_provider = "mock"
+
+    from forgecli.config.writer import update_config
+
+    update_config(default_provider=found_provider, default_model=model_lower)
+    console.print(f"[bold green]✓[/bold green] Default model changed to [bold]{display_model}[/bold]")
+
+
+@app.command("current")
+def current() -> None:
+    """Print the currently active model."""
+    console = get_console()
+    from forgecli.config.loader import ConfigLoader
+    from forgecli.providers.router import ModelRouter
+
+    context = bootstrap_context()
+
+    try:
+        settings = ConfigLoader().load()
+        default_p = settings.providers.default
+        default_m = settings.providers.default_model
+    except Exception:
+        default_p = "mock"
+        default_m = "auto"
+
+    router = ModelRouter(registry=context.container.resolve(ProviderRegistry))
+    if not default_m or default_m == "auto":
+        default_m = router.default_model_for(default_p)
+
+    display_model = MODEL_DISPLAY_NAMES.get(default_m.lower(), default_m)
+    console.print(f"Current Model: [bold cyan]{display_model}[/bold cyan] ({default_p.capitalize()})")
+
+
+@app.command("search")
+def search(
+    keyword: str = typer.Argument(..., help="Keyword to search models by.")
+) -> None:
+    """Search for models matching a keyword."""
+    console = get_console()
+    keyword = keyword.lower().strip()
+
+    console.print(f"[bold]Search results for '{keyword}':[/bold]\n")
+    matches = 0
+
+    for provider, models in STATIC_GROUPS.items():
+        for m in models:
+            display_name = MODEL_DISPLAY_NAMES.get(m, m)
+            if keyword in m.lower() or keyword in display_name.lower():
+                console.print(
+                    f"  • [cyan]{display_name}[/cyan] ({m}) - Provider: [bold]{provider}[/bold]"
+                )
+                matches += 1
+
+    if matches == 0:
+        console.print("No matching models found.")
+
+
+# ---------------------------------------------------------------------------
+# Backward Compatibility hidden commands
+# ---------------------------------------------------------------------------
+
+
+@app.command("claude", hidden=True)
+def claude_cmd(
+    model: str | None = typer.Option(None, "--model", "-m")
+) -> None:
+    from forgecli.config.writer import update_config
+
+    update_config(default_provider="anthropic", default_model=model or "auto")
+    get_console().print("[green]✓ Switched default provider to Anthropic[/green]")
+
+
+@app.command("openai", hidden=True)
+def openai_cmd(
+    model: str | None = typer.Option(None, "--model", "-m")
+) -> None:
+    from forgecli.config.writer import update_config
+
+    update_config(default_provider="openai", default_model=model or "auto")
+    get_console().print("[green]✓ Switched default provider to OpenAI[/green]")
+
+
+@app.command("gemini", hidden=True)
+def gemini_cmd(
+    model: str | None = typer.Option(None, "--model", "-m")
+) -> None:
+    from forgecli.config.writer import update_config
+
+    update_config(default_provider="google", default_model=model or "auto")
+    get_console().print("[green]✓ Switched default provider to Google[/green]")
+
+
+@app.command("auto", hidden=True)
+def auto_cmd() -> None:
+    from forgecli.config.writer import update_config
+
+    update_config(default_provider="mock", default_model="auto")
+    get_console().print("[green]✓ Set to auto (mock fallback)[/green]")
+
+
+@app.command("status", hidden=True)
+def status_cmd() -> None:
+    current()
 
 
 __all__ = ["app"]

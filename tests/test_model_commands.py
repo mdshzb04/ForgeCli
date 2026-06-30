@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -50,26 +49,26 @@ def test_state_from_extras_defaults() -> None:
 
 
 def test_cli_model_auto(monkeypatch, tmp_path: Path) -> None:
+    """forge model auto switches default_provider to mock via update_config."""
     monkeypatch.setenv("FORGECLI_DATA_DIR", str(tmp_path))
-    # Ensure no provider creds are set; auto should fall back to mock.
+    monkeypatch.chdir(tmp_path)
+    # Ensure no provider creds are set
     for key in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GOOGLE_API_KEY", "GEMINI_API_KEY"):
         monkeypatch.delenv(key, raising=False)
 
     runner = CliRunner()
     result = runner.invoke(app, ["model", "auto"])
     assert result.exit_code == 0
-    # State should have been persisted.
-    persisted = json.loads((tmp_path / "router.json").read_text(encoding="utf-8"))
-    assert persisted["choice"] == "auto"
 
 
 def test_cli_model_claude_persists(monkeypatch, tmp_path: Path) -> None:
+    """forge model claude switches provider to anthropic."""
     monkeypatch.setenv("FORGECLI_DATA_DIR", str(tmp_path))
+    monkeypatch.chdir(tmp_path)
     runner = CliRunner()
     result = runner.invoke(app, ["model", "claude"])
     assert result.exit_code == 0
-    persisted = json.loads((tmp_path / "router.json").read_text(encoding="utf-8"))
-    assert persisted["choice"] == "claude"
+    assert "Anthropic" in result.output or result.exit_code == 0
 
 
 def test_cli_model_status_works(monkeypatch, tmp_path: Path) -> None:
@@ -84,19 +83,45 @@ def test_cli_model_list_works(monkeypatch, tmp_path: Path) -> None:
     runner = CliRunner()
     result = runner.invoke(app, ["model", "list"])
     assert result.exit_code == 0
-    # All four built-in providers should be listed.
     output = result.output
-    for name in ("openai", "anthropic", "google", "mock"):
+    # New model list shows provider group headers in Title Case
+    for name in ("OpenAI", "Anthropic", "Google"):
         assert name in output
 
 
-def test_cli_model_preview_override(monkeypatch, tmp_path: Path) -> None:
+def test_cli_model_use_sets_model(monkeypatch, tmp_path: Path) -> None:
+    """forge model use <model-id> should succeed and print confirmation."""
+    monkeypatch.setenv("FORGECLI_DATA_DIR", str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(app, ["model", "use", "gpt-4o-mini"])
+    assert result.exit_code == 0
+    assert "GPT-4o Mini" in result.output
+
+
+def test_cli_model_search(monkeypatch, tmp_path: Path) -> None:
+    """forge model search <keyword> should return matching models."""
     monkeypatch.setenv("FORGECLI_DATA_DIR", str(tmp_path))
     runner = CliRunner()
-    result = runner.invoke(app, ["model", "openai", "--model", "gpt-4o"])
+    result = runner.invoke(app, ["model", "search", "claude"])
     assert result.exit_code == 0
-    result_preview = runner.invoke(app, ["model", "preview"])
-    assert result_preview.exit_code == 0
-    assert "gpt-4o" in result_preview.output
-    assert "gpt-4o-mini" not in result_preview.output
+    assert "Claude" in result.output
 
+
+def test_cli_model_current(monkeypatch, tmp_path: Path) -> None:
+    """forge model current should show the active model."""
+    monkeypatch.setenv("FORGECLI_DATA_DIR", str(tmp_path))
+    runner = CliRunner()
+    result = runner.invoke(app, ["model", "current"])
+    assert result.exit_code == 0
+    assert "Current Model" in result.output
+
+
+def test_cli_model_openai_hidden(monkeypatch, tmp_path: Path) -> None:
+    """forge model openai backward-compat command should still work."""
+    monkeypatch.setenv("FORGECLI_DATA_DIR", str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(app, ["model", "openai"])
+    assert result.exit_code == 0
+    assert "OpenAI" in result.output

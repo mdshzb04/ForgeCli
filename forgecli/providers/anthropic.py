@@ -144,6 +144,9 @@ class AnthropicProvider(HTTPChatProvider):
 
     def _known_models(self) -> list[ModelInfo]:
         return [
+            ModelInfo(id="claude-opus-4.1", context_window=200_000, supports_tools=True, supports_vision=True),
+            ModelInfo(id="claude-sonnet-4.5", context_window=200_000, supports_tools=True, supports_vision=True),
+            ModelInfo(id="claude-haiku-4.5", context_window=200_000, supports_tools=True),
             ModelInfo(id="claude-3-5-sonnet-latest", context_window=200_000, supports_tools=True, supports_vision=True),
             ModelInfo(id="claude-3-5-haiku-latest", context_window=200_000, supports_tools=True),
             ModelInfo(id="claude-3-opus-latest", context_window=200_000, supports_tools=True, supports_vision=True),

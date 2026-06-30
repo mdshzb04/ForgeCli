@@ -65,9 +65,20 @@ class HTTPChatProvider(Provider[Any]):
 
     def _resolve_api_key(self) -> str | None:
         env_var = getattr(self.config, "api_key_env", None)
-        if not env_var:
-            return None
-        return os.environ.get(env_var)
+        if env_var:
+            env_val = os.environ.get(env_var)
+            if env_val:
+                return env_val
+        from forgecli.core.credentials import get_api_key
+        # Check secure storage using provider name
+        val = get_api_key(self.name)
+        if val:
+            return val
+        if self.name == "google":
+            val = get_api_key("google") or get_api_key("gemini")
+            if val:
+                return val
+        return None
 
     def _format_request(self, request: ChatRequest) -> dict[str, Any]:
         raise NotImplementedError

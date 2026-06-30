@@ -41,6 +41,7 @@ class ProvidersConfig(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     default: str = "mock"
+    default_model: str = "auto"
     allowed: list[str] = Field(default_factory=lambda: ["mock"])
     providers: dict[str, ProviderSection] = Field(default_factory=dict)
 

@@ -128,6 +128,10 @@ class OpenAIProvider(HTTPChatProvider):
 
     def _known_models(self) -> list[ModelInfo]:
         return [
+            ModelInfo(id="gpt-5", context_window=128_000, supports_tools=True, supports_vision=True),
+            ModelInfo(id="gpt-5-mini", context_window=128_000, supports_tools=True, supports_vision=True),
+            ModelInfo(id="gpt-4.1", context_window=128_000, supports_tools=True, supports_vision=True),
+            ModelInfo(id="gpt-4.1-mini", context_window=128_000, supports_tools=True, supports_vision=True),
             ModelInfo(id="gpt-4o", context_window=128_000, supports_tools=True, supports_vision=True),
             ModelInfo(id="gpt-4o-mini", context_window=128_000, supports_tools=True, supports_vision=True),
             ModelInfo(id="gpt-4-turbo", context_window=128_000, supports_tools=True, supports_vision=True),

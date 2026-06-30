@@ -88,6 +88,12 @@ class ModelRouter:
             "openai": "gpt-4o-mini",
             "anthropic": "claude-3-5-haiku-latest",
             "google": "gemini-1.5-flash",
+            "openrouter": "glm-5.2",
+            "groq": "llama-4-scout",
+            "mistral": "mistral-large",
+            "ollama": "llama3",
+            "lmstudio": "local-model",
+            "vllm": "local-model",
             "mock": "mock-model",
         }
     )
@@ -258,6 +264,12 @@ _DEFAULT_MODEL_BY_PROVIDER: dict[str, str] = {
     "openai": "gpt-4o-mini",
     "anthropic": "claude-3-5-haiku-latest",
     "google": "gemini-1.5-flash",
+    "openrouter": "glm-5.2",
+    "groq": "llama-4-scout",
+    "mistral": "mistral-large",
+    "ollama": "llama3",
+    "lmstudio": "local-model",
+    "vllm": "local-model",
     "mock": "mock-model",
 }
 
@@ -270,14 +282,20 @@ _PROVIDER_ENV_VARS: dict[str, tuple[str, ...]] = {
     "mistral": ("MISTRAL_API_KEY",),
     "groq": ("GROQ_API_KEY",),
     "openrouter": ("OPENROUTER_API_KEY",),
+    "ollama": ("OLLAMA_API_KEY",),
+    "lmstudio": ("LMSTUDIO_API_KEY",),
+    "vllm": ("VLLM_API_KEY",),
 }
 
 
 def _provider_has_credentials(name: str) -> bool:
-    """Return True if any known env var for ``name`` is non-empty."""
+    """Return True if any known env var or secure storage key for ``name`` is non-empty."""
     if name == "mock":
         return True
-    return any(os.environ.get(env_var) for env_var in _PROVIDER_ENV_VARS.get(name, ()))
+    if any(os.environ.get(env_var) for env_var in _PROVIDER_ENV_VARS.get(name, ())):
+        return True
+    from forgecli.core.credentials import get_api_key
+    return bool(get_api_key(name))
 
 
 def estimate_cost(

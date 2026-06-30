@@ -53,12 +53,27 @@ def bootstrap_context(
 
     loader = ConfigLoader(config_path) if config_path else ConfigLoader()
 
+    from forgecli.providers.openai_compatible import (
+        GroqProvider,
+        LMStudioProvider,
+        MistralProvider,
+        OllamaProvider,
+        OpenRouterProvider,
+        VllmProvider,
+    )
+
     provider_registry: ProviderRegistry = default_registry
     for name, cls in (
         ("mock", MockProvider),
         ("openai", OpenAIProvider),
         ("anthropic", AnthropicProvider),
         ("google", GeminiProvider),
+        ("openrouter", OpenRouterProvider),
+        ("groq", GroqProvider),
+        ("mistral", MistralProvider),
+        ("ollama", OllamaProvider),
+        ("lmstudio", LMStudioProvider),
+        ("vllm", VllmProvider),
     ):
         provider_registry.register(name, cls)
 

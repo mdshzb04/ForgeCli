@@ -14,6 +14,7 @@ import typer
 from forgecli import __app_name__, __version__
 from forgecli.cli import (
     commands_ask,
+    commands_auth,
     commands_build,
     commands_commit,
     commands_config,
@@ -57,7 +58,9 @@ app = typer.Typer(
 
 app.add_typer(commands_init.app, name="init")
 app.add_typer(commands_config.app, name="config")
+app.add_typer(commands_auth.app, name="auth")
 app.add_typer(commands_providers.app, name="providers")
+app.add_typer(commands_providers.app, name="provider")
 app.add_typer(commands_model.app, name="model")
 app.add_typer(commands_index.app, name="index")
 app.add_typer(commands_graph.app, name="graph")

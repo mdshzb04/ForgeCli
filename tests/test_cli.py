@@ -28,7 +28,8 @@ def test_cli_providers_list() -> None:
     runner = CliRunner()
     result = runner.invoke(app, ["providers", "list"])
     assert result.exit_code == 0
-    assert "mock" in result.output
+    # New providers list shows display names for real providers
+    assert "OpenAI" in result.output or "Anthropic" in result.output or "Groq" in result.output
 
 
 def test_cli_status() -> None:
