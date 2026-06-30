@@ -37,11 +37,6 @@ from forgecli.engine.runner import (
     render_engine_result as engine_summary,
 )
 from forgecli.optimizer.ponytail import PromptOptimizer
-from forgecli.providers.base import Provider, ProviderRegistry
-from forgecli.providers.mock import MockProvider, MockProviderConfig
-from forgecli.providers.router import ModelRouter
-from forgecli.providers.router_state import load_state
-from forgecli.utils.paths import ProjectPaths
 
 app = typer.Typer(
     help="Run the build pipeline (Graphify → Ponytail → LLM → apply → test → summarize).",
@@ -132,7 +127,6 @@ async def _run_build(
     use_engine: bool = False,
 ) -> None:
     context = bootstrap_context(cwd=str(path))
-    paths: ProjectPaths = context.paths
     target = path.resolve()
 
     from forgecli.cli.bootstrap import resolve_provider_and_decision
@@ -200,8 +194,6 @@ async def _run_build(
     build_context = build_context_from(
         prompt,
         root=target,
-        router=router,
-        state=state,
     )
     # Re-resolve the decision after we've decided on live vs mock.
     build_context.decision = decision

@@ -16,7 +16,6 @@ from forgecli.orchestrator import (
     Orchestrator,
     PluginRegistry,
 )
-from forgecli.providers.mock import MockProvider, MockProviderConfig
 
 app = typer.Typer(
     help="Auto-generate a project overview from the knowledge graph.",

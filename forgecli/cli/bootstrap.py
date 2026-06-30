@@ -228,11 +228,17 @@ def resolve_provider_and_decision(
     If live is True and no provider has credentials (which resolves to mock),
     it displays the error requesting configuration and exits with code 1.
     """
-    from forgecli.providers.mock import MockProvider, MockProviderConfig
-    from forgecli.providers.router import ModelRouter, RouteDecision, SelectionMode, _provider_has_credentials
-    from forgecli.providers.router_state import load_state as load_router_state
-    from forgecli.providers.base import ProviderRegistry
     import typer
+
+    from forgecli.providers.base import ProviderRegistry
+    from forgecli.providers.mock import MockProvider, MockProviderConfig
+    from forgecli.providers.router import (
+        ModelRouter,
+        RouteDecision,
+        SelectionMode,
+        _provider_has_credentials,
+    )
+    from forgecli.providers.router_state import load_state as load_router_state
 
     if isinstance(cwd, str):
         cwd = Path(cwd)

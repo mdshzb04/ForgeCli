@@ -26,7 +26,6 @@ from pathlib import Path
 
 import typer
 
-from forgecli.cli.bootstrap import bootstrap_context
 from forgecli.cli.ui import error, get_console, info, success, table, warn
 from forgecli.commit.git_utils import GitRepoError, diff_staged
 from forgecli.orchestrator import (
