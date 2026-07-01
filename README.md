@@ -145,10 +145,8 @@ Environment variables are documented in [`.env.example`](.env.example).
 | `forge explain X`          | Top-level alias for `forge graph explain X`              |
 | `forge plan <goal>`        | Build a software plan (architecture, milestones, tasks, risks) |
 | `forge review`             | Run a code-quality review (security, performance, architecture, etc.) |
-| `forge commit`             | Generate a conventional commit + changelog entry        |
-| `forge commit release`     | Promote unreleased changelog entries to versioned block  |
+| `forge commit`             | Premium AI-powered Conventional Commit generator        |
 | `forge build`              | Run the builder pipeline on a natural-language prompt    |
-| `forge git`                | Inspect / operate on the git repository                  |
 | `forge history`            | Show recent CLI command history                          |
 | `forge docs`               | Automatically generate project markdown documentation    |
 | `forge release`            | Cut a release (changelog, tag, commit, push)             |
@@ -376,39 +374,19 @@ pipe the report into CI dashboards.
 
 ## Semantic commits
 
-`forge commit` runs against the current git diff and produces a
-Conventional Commits-style message, a changelog entry, and an
-optional release-notes document. It is fully self-contained: it
-subprocesses `git` directly and never imports a Python git library.
+`forge commit` is the premium AI-powered git commit command. It automatically optimizes your diff analysis using Ponytail, generates a Conventional Commit message, displays a preview, and commits the staged changes upon confirmation.
 
 ```bash
-# Inspect the proposed message + changelog draft; make no changes.
-forge commit --dry-run
-
-# Stage everything in the working tree, commit, update CHANGELOG.md.
-forge commit --all --yes --changelog
-
-# Override the auto-generated message and sign off.
-forge commit --all --yes -m "feat(graph): add Graphify integration" --signoff
-
-# Render release notes from the current Unreleased entries.
-forge commit release 1.2.0 --notes-path release-notes.md
+# Generate and apply an AI Conventional Commit from your staged changes
+forge commit
 ```
 
-What the analyzer infers:
-
-* **Kind** (`feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`,
-  `build`, `ci`, `style`) from the file kinds in the diff.
-* **Scope** from the top-level directory under the project source root
-  (e.g. `forgecli/graph/...` → scope `graph`).
-* **Summary** as `verb(scope): payload` — `add(graph): graph.py`.
-* **Breaking** when the diff contains a Conventional Commits footer
-  (`BREAKING CHANGE: …` on its own line) or a `feat!:`-style subject.
-
-The `--changelog` flag appends the entry to `CHANGELOG.md` under an
-"Unreleased" section. `forge commit release <version>` promotes those
-entries to a versioned section (`## [1.2.0] - 2024-05-12`) and writes
-the release notes to the path of your choice.
+### Workflow
+1. **Read staged changes**: Checks for staged changes (`git diff --cached`). If none are staged, it guides you to run `git add`.
+2. **Ponytail prompt optimization**: Passes the diff through Ponytail to optimize instructions before reaching the LLM.
+3. **AI conventional commit**: Leverages your active provider, model, and API keys to produce a concise Conventional Commit message.
+4. **Interactive preview**: Displays a beautiful terminal preview of the generated message.
+5. **Create commit**: Runs `git commit -m "<generated message>"` upon pressing Enter.
 
 ---
 

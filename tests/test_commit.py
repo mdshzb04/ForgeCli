@@ -432,6 +432,72 @@ def test_git_utils_raises_on_missing_binary(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# CLI Commands
+# ---------------------------------------------------------------------------
+
+
+def test_cli_commit_non_git(tmp_path: Path) -> None:
+    from typer.testing import CliRunner
+
+    from forgecli.cli.main import app
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["commit", "-p", str(tmp_path)])
+    assert result.exit_code == 1
+    assert "is not" in result.output and "git working tree" in result.output
+
+
+def test_cli_commit_no_staged_changes(tmp_path: Path, monkeypatch) -> None:
+    from typer.testing import CliRunner
+
+    from forgecli.cli.main import app
+
+    monkeypatch.setattr("forgecli.cli.commands_commit.is_git_repo", lambda _: True)
+    monkeypatch.setattr("forgecli.cli.commands_commit.diff_staged", lambda _: "")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["commit", "-p", str(tmp_path)])
+    assert result.exit_code == 1
+    assert "No staged changes found." in result.output
+
+
+def test_cli_commit_success(tmp_path: Path, monkeypatch) -> None:
+    from typer.testing import CliRunner
+
+    from forgecli.cli.main import app
+    from forgecli.providers.mock import MockProvider, MockProviderConfig
+    from forgecli.providers.router import RouteDecision, SelectionMode
+
+    monkeypatch.setattr("forgecli.cli.commands_commit.is_git_repo", lambda _: True)
+    monkeypatch.setattr("forgecli.cli.commands_commit.diff_staged", lambda _: "diff data")
+
+    # Mock input to return immediately (simulating pressing Enter)
+    monkeypatch.setattr("builtins.input", lambda *args, **kwargs: "")
+
+    # Mock _run_git to avoid actually calling git commit
+    git_calls = []
+    monkeypatch.setattr("forgecli.cli.commands_commit._run_git", lambda args, proj: git_calls.append(args))
+
+    # Mock provider and decision resolver
+    mock_provider = MockProvider(MockProviderConfig())
+    mock_decision = RouteDecision(provider_name="mock", model="mock-model", mode=SelectionMode.EXPLICIT)
+    monkeypatch.setattr(
+        "forgecli.cli.bootstrap.resolve_provider_and_decision",
+        lambda live, cwd: (mock_provider, mock_decision)
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["commit", "-p", str(tmp_path)])
+
+    assert result.exit_code == 0
+    assert "AI Generated Commit Message" in result.output
+    assert "✓ Commit created successfully." in result.output
+    assert len(git_calls) == 1
+    assert git_calls[0][0] == "commit"
+    assert "-m" in git_calls[0]
+
+
+# ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
 

@@ -49,7 +49,20 @@ class MockProvider(Provider[MockProviderConfig]):
             for m in request.messages
         )
 
-        if has_diff_request:
+        has_commit_request = any(
+            "commit" in m.content.lower()
+            for m in request.messages
+        ) or "commit" in text.lower()
+
+        if has_commit_request:
+            content = (
+                "feat(auth): add secure provider authentication\n\n"
+                "- add OS keychain credential storage\n"
+                "- support provider selection\n"
+                "- improve onboarding flow\n"
+                "- add regression tests"
+            )
+        elif has_diff_request:
             text_lower = text.lower()
             if "next.js" in text_lower or "next" in text_lower or "page.tsx" in text_lower or "tsx" in text_lower:
                 filename = "page.tsx"

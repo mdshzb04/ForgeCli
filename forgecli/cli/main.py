@@ -21,7 +21,6 @@ from forgecli.cli import (
     commands_docs,
     commands_doctor,
     commands_explain,
-    commands_git,
     commands_graph,
     commands_history,
     commands_index,
@@ -90,7 +89,6 @@ app.command(
     context_settings={"allow_interspersed_args": True},
 )(commands_release.release_cmd)
 
-app.add_typer(commands_git.app, name="git")
 app.add_typer(commands_history.app, name="history")
 
 app.command(
