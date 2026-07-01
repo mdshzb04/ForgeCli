@@ -16,7 +16,7 @@ from forgecli.orchestrator import (
 )
 
 app = typer.Typer(
-    help="Explain a node, file, or symbol using the Graphify knowledge graph and LLM.",
+    help="Explain a file or symbol.",
     invoke_without_command=True,
     rich_markup_mode="rich",
 )
@@ -30,7 +30,7 @@ def main(
     live: bool = typer.Option(True, "--live/--mock", help="Use the real provider chosen by the router (default: True)."),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output."),
 ) -> None:
-    """Explain a node, file, or symbol using the Graphify knowledge graph and LLM."""
+    """Explain a file or symbol."""
     if ctx.invoked_subcommand is not None:
         return
     asyncio.run(_run_explain(target, Path(path), live, verbose))

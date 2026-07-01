@@ -294,3 +294,16 @@ def test_orchestrator_uses_custom_classifier_first() -> None:
 # Silence unused-import warnings for symbols only used in some branches.
 _ = DocsWorkflow
 _ = textwrap
+
+
+def test_asks_for_repo_context() -> None:
+    from forgecli.orchestrator import _asks_for_repo_context
+
+    assert not _asks_for_repo_context("hello")
+    assert not _asks_for_repo_context("hi")
+    assert not _asks_for_repo_context("howdy")
+    assert _asks_for_repo_context("tell me about the project")
+    assert _asks_for_repo_context("explain the files in the directory")
+    assert _asks_for_repo_context("what is this project?")
+    assert _asks_for_repo_context("how does the main.py structure look?")
+

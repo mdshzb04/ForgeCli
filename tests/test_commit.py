@@ -490,9 +490,9 @@ def test_cli_commit_success(tmp_path: Path, monkeypatch) -> None:
     result = runner.invoke(app, ["commit", "-p", str(tmp_path)])
 
     assert result.exit_code == 0
-    assert "AI Generated Commit Message" in result.output
-    assert "✓ Commit created successfully." in result.output
-    assert len(git_calls) == 1
+    assert "AI Commit Preview" in result.output
+    assert "✓ Commit Created" in result.output
+    assert len(git_calls) == 2
     assert git_calls[0][0] == "commit"
     assert "-m" in git_calls[0]
 

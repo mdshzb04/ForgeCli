@@ -37,7 +37,7 @@ from forgecli.engine.runner import (
 from forgecli.optimizer.ponytail import PromptOptimizer
 
 app = typer.Typer(
-    help="Run the build pipeline (Graphify → Ponytail → LLM → apply → test → summarize).",
+    help="Build code changes based on a prompt.",
     no_args_is_help=True,
     rich_markup_mode="rich",
     context_settings={"allow_interspersed_args": True},

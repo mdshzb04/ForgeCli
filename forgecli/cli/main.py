@@ -27,7 +27,6 @@ from forgecli.cli import (
     commands_info,
     commands_init,
     commands_model,
-    commands_optimizer,
     commands_plan,
     commands_plugin,
     commands_providers,
@@ -63,12 +62,10 @@ app.add_typer(commands_providers.app, name="provider")
 app.add_typer(commands_model.app, name="model")
 app.add_typer(commands_index.app, name="index")
 app.add_typer(commands_graph.app, name="graph")
-app.add_typer(commands_optimizer.app, name="optimizer")
 app.add_typer(commands_plan.app, name="plan")
-
 app.command(
     "build",
-    help="Run the build pipeline (Graphify → Ponytail → LLM → apply → test → summarize).",
+    help="Build code changes based on a prompt.",
     context_settings={"allow_interspersed_args": True},
 )(commands_build.build_cmd)
 
@@ -77,7 +74,7 @@ app.add_typer(commands_review.app, name="review")
 
 app.command(
     "ask",
-    help="Ask a question about the repository (uses Graphify + Ponytail + LLM).",
+    help="Ask a question about the repository.",
     context_settings={"allow_interspersed_args": True},
 )(commands_ask.ask_cmd)
 
@@ -93,15 +90,10 @@ app.add_typer(commands_history.app, name="history")
 
 app.command(
     "explain",
-    help="Explain a node, file, or symbol using the Graphify knowledge graph.",
+    help="Explain a file or symbol.",
     context_settings={"allow_interspersed_args": True},
 )(commands_explain.main)
 
-app.command(
-    "optimize",
-    help="Optimize a prompt or request using the Ponytail optimizer.",
-    context_settings={"allow_interspersed_args": True},
-)(commands_optimizer.preview_cmd)
 
 app.add_typer(commands_doctor.app, name="doctor")
 app.add_typer(commands_plugin.app, name="plugin")
@@ -278,8 +270,7 @@ def main(
     """ForgeCLI global entry point.
 
     With ``--prompt "<request>"`` (no subcommand) the orchestrator
-    runs the full Graphify -> Ponytail -> LLM -> apply -> test ->
-    auto-fix -> summary pipeline. With a subcommand, ForgeCLI
+    runs the full build pipeline. With a subcommand, ForgeCLI
     dispatches to that subcommand.
     """
     extras: dict[str, object] = {"verbose": verbose}
@@ -304,7 +295,7 @@ def main(
             f"  [bold cyan]ForgeCLI[/bold cyan] [dim]v{__version__}[/dim] • [bold white]Developer Operating System[/bold white]"
         )
         console.print(
-            "  [dim]Orchestrates code intelligence, prompt optimization, and LLMs.[/dim]\n"
+            "  [dim]Orchestrates codebase intelligence and LLMs.[/dim]\n"
         )
         console.print(
             "  [bold]Usage:[/bold]\n"

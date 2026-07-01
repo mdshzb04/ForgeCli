@@ -49,7 +49,7 @@ entry-point group — no core changes required.
 - **Provider abstraction + router** — `forge model claude|openai|gemini|auto` picks a real provider behind a unified interface (OpenAI, Anthropic, Google Gemini). With `auto`, the router picks the cheapest compatible model based on a per-1k-token price table.
 - **Dependency injection** via a lightweight `Container` exposed through `AppContext`.
 - **Graphify-powered knowledge graph** — `forge graph build / query / explain` shells out to the [Graphify](https://graphifylabs.ai/) CLI behind a clean `RepositoryGraph` interface. No Graphify code is modified or vendored.
-- **Ponytail prompt optimizer** — `forge optimizer on|off|lite|full|ultra` rewrites every chat prompt before it reaches a provider, applying the [Ponytail](https://ponytail.dev/) "ladder" (YAGNI → reuse existing helpers → stdlib → native → installed deps → one-liner → minimum code). Optional external `ponytail` binary is auto-detected and preferred when present.
+- **Ponytail prompt optimizer** — rewrites every chat prompt silently in the background before it reaches a provider, applying the [Ponytail](https://ponytail.dev/) "ladder" (YAGNI → reuse existing helpers → stdlib → native → installed deps → one-liner → minimum code). Optional external `ponytail` binary is auto-detected and preferred when present.
 - **Context optimizer** that chunks, ranks, and (optionally) summarizes large repositories for LLM context windows.
 - **Planner + Agent** for declarative, multi-step task execution.
 - **Auto-fix loop** — if tests fail, the LLM is asked for a focused fix and the patch is retried up to `max_fix_attempts` times.
@@ -137,11 +137,6 @@ Environment variables are documented in [`.env.example`](.env.example).
 | `forge graph path A B`     | Shortest edge path between two nodes                     |
 | `forge graph affected X`   | Reverse-traverse to find blast radius of a node          |
 | `forge graph open`         | Open interactive graph visualization in web browser      |
-| `forge optimizer on`       | Turn the Ponytail prompt optimizer on                    |
-| `forge optimizer off`      | Turn the Ponytail prompt optimizer off                   |
-| `forge optimizer status`   | Show current intensity, backend, and binary path         |
-| `forge optimizer preview`  | Show what would be prepended to a system message         |
-| `forge optimizer set`      | Manually configure Ponytail intensity and backend        |
 | `forge explain X`          | Top-level alias for `forge graph explain X`              |
 | `forge plan <goal>`        | Build a software plan (architecture, milestones, tasks, risks) |
 | `forge review`             | Run a code-quality review (security, performance, architecture, etc.) |
@@ -210,22 +205,12 @@ tests and small projects that don't need full AST extraction.
 
 ## Ponytail prompt optimizer
 
-[Ponitail](https://ponytail.dev/) is a *ruleset* that nudges AI coding
+[Ponytail](https://ponytail.dev/) is a *ruleset* that nudges AI coding
 agents toward the smallest correct code change. ForgeCLI ships the
 ruleset in pure Python (`forgecli.optimizer.ponytail.ruleset`) and
 also wraps an external `ponytail` binary when one is installed.
 
-```bash
-# Intensity levels: lite (default) | full | ultra
-forge optimizer on                 # restore last intensity (or default to lite)
-forge optimizer off                # pass prompts through unchanged
-forge optimizer lite
-forge optimizer full
-forge optimizer ultra
-forge optimizer set full --backend cli --binary /usr/local/bin/ponytail
-forge optimizer status             # show current state
-forge optimizer preview "build a CLI"   # see the rewritten system prompt
-```
+The optimizer runs automatically in the background on every chat request.
 
 The ruleset implements the official "ladder":
 

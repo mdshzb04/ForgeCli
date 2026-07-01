@@ -10,8 +10,10 @@ import typer
 from forgecli.cli.ui import get_console
 from forgecli.commit.git_utils import (
     GitRepoError,
+    current_branch,
     diff_staged,
     is_git_repo,
+    status_porcelain,
 )
 
 app = typer.Typer(
@@ -33,7 +35,30 @@ def commit_cmd(
     asyncio.run(run_commit_workflow(Path(path)))
 
 
+def get_staged_stats(project_path: Path) -> dict[str, int]:
+    lines = status_porcelain(project_path)
+    modified = 0
+    added = 0
+    deleted = 0
+    for line in lines:
+        if len(line) < 2:
+            continue
+        x = line[0]
+        # X is the status of the index (staged)
+        if x in ('M', 'R'):
+            modified += 1
+        elif x in ('A', 'C'):
+            added += 1
+        elif x == 'D':
+            deleted += 1
+    return {"modified": modified, "added": added, "deleted": deleted}
+
+
 async def run_commit_workflow(project_path: Path) -> None:
+    from rich.box import ROUNDED
+    from rich.panel import Panel
+    from rich.text import Text
+
     from forgecli.cli.bootstrap import bootstrap_context, resolve_provider_and_decision
     from forgecli.optimizer.ponytail import PromptOptimizer
     from forgecli.providers.base import ChatMessage, ChatRequest, Role
@@ -57,7 +82,7 @@ async def run_commit_workflow(project_path: Path) -> None:
         f"Git Diff:\n{diff}"
     )
 
-    # Ponytail optimization
+    # Ponytail optimization (run silently in background)
     app_context = bootstrap_context(cwd=project_path)
     optimizer = app_context.container.resolve(PromptOptimizer)  # type: ignore[type-abstract]
     request = ChatRequest(
@@ -68,18 +93,35 @@ async def run_commit_workflow(project_path: Path) -> None:
 
     # LLM Call
     provider, decision = resolve_provider_and_decision(live=True, cwd=project_path)
+
+    # Bypass OptimizedProvider wrapper to prevent Ponytail rules from rewriting/compressing the final commit message
+    raw_provider = provider._base if hasattr(provider, "_base") else provider
+
+
     commit_request = ChatRequest(
         model=decision.model if decision else None,
         messages=[
             ChatMessage(
                 role=Role.SYSTEM,
-                content="You are a senior software engineer specialized in creating concise Conventional Commit messages."
+                content=(
+                    "You are a senior software engineer specialized in creating concise Conventional Commit messages. "
+                    "Write clean, human-quality Conventional Commits like experienced maintainers. "
+                    "Do NOT write Ponytail/YAGNI summaries, rules, or optimization choices. "
+                    "Focus only on describing the actual codebase changes.\n\n"
+                    "Format example:\n"
+                    "feat(cli): improve build workflow output\n\n"
+                    "- redesign build result UI\n"
+                    "- add syntax-highlighted code previews\n"
+                    "- simplify offline mode messaging\n"
+                    "- improve CLI presentation\n\n"
+                    "Output ONLY the raw commit message. Do not include markdown fences, backticks, or any explanation."
+                )
             ),
             ChatMessage(role=Role.USER, content=optimized_prompt),
         ],
     )
 
-    response = await provider.chat(commit_request)
+    response = await raw_provider.chat(commit_request)
     commit_message = response.message.content.strip()
 
     if commit_message.startswith("```"):
@@ -90,12 +132,41 @@ async def run_commit_workflow(project_path: Path) -> None:
             lines = lines[:-1]
         commit_message = "\n".join(lines).strip()
 
-    console.print("────────────────────────────────────────\n")
-    console.print("[bold yellow]AI Generated Commit Message[/bold yellow]\n")
-    console.print(commit_message)
-    console.print("\n────────────────────────────────────────\n")
-    console.print("Press Enter to commit")
-    console.print("Press Ctrl+C to cancel")
+    repo_name = project_path.resolve().name
+    branch_name = current_branch(project_path)
+    stats = get_staged_stats(project_path)
+
+    parts = []
+    if stats["modified"] > 0:
+        parts.append(f"{stats['modified']} modified")
+    if stats["added"] > 0:
+        parts.append(f"{stats['added']} added")
+    if stats["deleted"] > 0:
+        parts.append(f"{stats['deleted']} deleted")
+    stats_str = " • ".join(parts) if parts else "0 modified • 0 added • 0 deleted"
+
+    # Display the message inside a beautiful Rich panel with repo, branch, and changed files
+    preview_text = Text()
+    preview_text.append("Repository  ", style="bold cyan")
+    preview_text.append(f"{repo_name}\n", style="white")
+    preview_text.append("Branch      ", style="bold cyan")
+    preview_text.append(f"{branch_name}\n", style="white")
+    preview_text.append("Files       ", style="bold cyan")
+    preview_text.append(f"{stats_str}\n\n", style="white")
+    preview_text.append("────────────────────────────────────────\n\n", style="dim")
+    preview_text.append(commit_message, style="white")
+
+    panel = Panel(
+        preview_text,
+        title="[bold yellow]AI Commit Preview[/bold yellow]",
+        border_style="cyan",
+        box=ROUNDED,
+        padding=(1, 2),
+    )
+    console.print(panel)
+    console.print()
+    console.print("Press [bold green]Enter[/bold green] to commit")
+    console.print("Press [bold red]Ctrl+C[/bold red] to cancel")
 
     try:
         input()
@@ -109,7 +180,35 @@ async def run_commit_workflow(project_path: Path) -> None:
         console.print(f"[bold red]Error committing changes:[/bold red] {exc}")
         raise typer.Exit(code=1) from exc
 
-    console.print("[bold green]✓ Commit created successfully.[/bold green]")
+    # After committing, show post-commit details
+    try:
+        commit_hash = _run_git(["rev-parse", "HEAD"], project_path).strip()
+        short_hash = commit_hash[:7]
+    except Exception:
+        short_hash = "unknown"
+
+    console.print()
+    summary_text = Text()
+    summary_text.append("Repository\n", style="bold cyan")
+    summary_text.append(f"{repo_name}\n\n", style="white")
+    summary_text.append("Branch\n", style="bold cyan")
+    summary_text.append(f"{branch_name}\n\n", style="white")
+    summary_text.append("Files\n", style="bold cyan")
+    summary_text.append(f"{stats_str}\n\n", style="white")
+    summary_text.append("  - [bold green]✓ Commit Created[/bold green]\n")
+    summary_text.append(f"  - [bold]Commit hash:[/bold] {short_hash}\n")
+    summary_text.append(f"  - [bold]Branch:[/bold] {branch_name}\n")
+    summary_text.append(f"  - [bold]Commit message:[/bold] {commit_message.splitlines()[0]}\n")
+    summary_text.append("  - [bold yellow]Tip:[/bold yellow] `git push`")
+
+    post_panel = Panel(
+        summary_text,
+        title="[bold green]Commit Success[/bold green]",
+        border_style="green",
+        box=ROUNDED,
+        padding=(1, 2),
+    )
+    console.print(post_panel)
 
 
 def _run_git(args: list[str], project: Path) -> str:

@@ -23,7 +23,7 @@ from forgecli.graph.backend_graphify import GraphifyRepositoryGraph
 from forgecli.utils.paths import to_privacy_path
 
 app = typer.Typer(
-    help="Build, query, and traverse the repository knowledge graph (Graphify).",
+    help="Build, query, and traverse the codebase graph.",
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
@@ -82,7 +82,7 @@ def build_cmd(
         False, "--no-cluster", help="Skip Leiden clustering."
     ),
 ) -> None:
-    """Build (or rebuild) the Graphify knowledge graph for ``path``."""
+    """Build (or rebuild) the codebase graph for ``path``."""
     import asyncio
 
     backend = _build_backend(Path(path))

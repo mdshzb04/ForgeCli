@@ -417,6 +417,31 @@ def _default_workflow_factory(intent: Intent) -> Workflow:
 # ---------------------------------------------------------------------------
 
 
+def _asks_for_repo_context(prompt: str) -> bool:
+    import re
+    text = (prompt or "").strip().lower()
+    greetings = {"hi", "hello", "hey", "howdy", "greetings", "good morning", "good afternoon", "good evening", "how are you", "what's up", "yo"}
+    words = re.findall(r"\b\w+\b", text)
+    if not words:
+        return False
+    if len(words) <= 3 and any(w in greetings for w in words):
+        return False
+
+    keywords = {
+        "project", "repository", "repo", "code", "file", "files", "architecture", "implementation", "bug", "bugs",
+        "docs", "documentation", "structure", "folder", "directory", "dir", "function", "method", "class", "module",
+        "current", "this", "here"
+    }
+    extensions = {".py", ".ts", ".tsx", ".js", ".jsx", ".json", ".md", ".html", ".css", ".yml", ".yaml", ".toml", "package.json"}
+    if any(ext in text for ext in extensions):
+        return True
+
+    if any(w in keywords for w in words):
+        return True
+
+    return "what is this" in text or "explain this" in text or "this project" in text
+
+
 class AskWorkflow(Workflow):
     """A conversational Q&A workflow against the project graph."""
 
@@ -434,14 +459,17 @@ class AskWorkflow(Workflow):
         decision = context.extras.get("build_extras", {}).get("decision")
         build_context = BuildContext(prompt=context.prompt, root=Path.cwd(), decision=decision)
         build_context.extras.update(context.extras.get("build_extras", {}))
-        pipeline = BuildPipeline(
-            [
-                ("graphify-retrieval", graphify_retrieval),
-                ("ponytail-optimize", ponytail_optimization),
-                ("llm", llm_call),
-                ("summarize", summarize),
-            ]
-        )
+
+        stages: list[tuple[str, Any]] = []
+        if _asks_for_repo_context(context.prompt):
+            stages.append(("graphify-retrieval", graphify_retrieval))
+        stages.extend([
+            ("ponytail-optimize", ponytail_optimization),
+            ("llm", llm_call),
+            ("summarize", summarize),
+        ])
+
+        pipeline = BuildPipeline(stages)
         result = await pipeline.run(build_context)
         if not result.success:
             err = "Pipeline stage failed"

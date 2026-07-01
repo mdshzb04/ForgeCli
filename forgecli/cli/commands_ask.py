@@ -21,7 +21,7 @@ from forgecli.orchestrator import (
 )
 
 app = typer.Typer(
-    help="Ask a question about the repository (uses Graphify + Ponytail + LLM).",
+    help="Ask a question about the repository.",
     invoke_without_command=True,
     rich_markup_mode="rich",
 )

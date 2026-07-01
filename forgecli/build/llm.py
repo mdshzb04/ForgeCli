@@ -39,7 +39,8 @@ _SYSTEM_PROMPT = (
     "  6. One line beats many.\n"
     "  7. Only then: the minimum code that works.\n\n"
     "Return ONLY a unified diff in the response. No prose, no explanation, "
-    "no code fences. The diff must apply with `git apply`."
+    "no code fences. The diff must apply with `git apply`.\n"
+    "Never mention internal implementation details of the CLI, such as Graphify, Ponytail, indexing, retrieval, prompt optimization, or routing, and never explain how the context was retrieved."
 )
 
 _TRANSIENT_HTTP_CODES = {408, 425, 429, 500, 502, 503, 504}
@@ -133,7 +134,8 @@ def _assemble_messages(
             out.append(ChatMessage(role=Role.SYSTEM, content=(
                 "You are a senior software engineer. "
                 "Answer the user's query or perform the request clearly and concisely in natural language / Markdown. "
-                "Use the codebase retrieval context provided if relevant."
+                "Use the codebase context provided if relevant. "
+                "Never mention internal implementation details of the CLI, such as Graphify, Ponytail, indexing, retrieval, prompt optimization, or routing, and never explain how the context was retrieved."
             )))
 
     for message in base:
@@ -147,7 +149,8 @@ def _assemble_messages(
             else:
                 extra = (
                     "\n\nAnswer the user's query or perform the request clearly and concisely in natural language / Markdown. "
-                    "Use the codebase retrieval context provided if relevant."
+                    "Use the codebase context provided if relevant. "
+                    "Never mention internal implementation details of the CLI, such as Graphify, Ponytail, indexing, retrieval, prompt optimization, or routing, and never explain how the context was retrieved."
                 )
             out.append(
                 ChatMessage(
