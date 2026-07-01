@@ -38,6 +38,38 @@ async def _require_graphify(backend: GraphifyRepositoryGraph) -> None:
         raise typer.Exit(code=1) from None
 
 
+def setup_graphify_credentials(path: Path) -> str | None:
+    """Read the active provider, load its API key, set env vars, and return provider name if configured."""
+    from forgecli.cli.bootstrap import bootstrap_context
+    from forgecli.core.credentials import get_api_key
+    from forgecli.providers.router import _PROVIDER_ENV_VARS, ModelRouter
+    from forgecli.providers.router_state import load_state as load_router_state
+
+    app_context = bootstrap_context(cwd=path)
+    state = load_router_state(app_context.paths.data_dir / "router.json")
+    router = app_context.container.resolve(ModelRouter)
+    decision = router.select(state.choice)
+
+    provider_name = decision.provider_name
+    if provider_name == "mock":
+        return None
+
+    # Try env vars first
+    env_vars = _PROVIDER_ENV_VARS.get(provider_name, ())
+    for ev in env_vars:
+        if os.environ.get(ev):
+            return provider_name
+
+    # Try keychain/credential manager
+    api_key = get_api_key(provider_name)
+    if api_key:
+        for ev in env_vars:
+            os.environ[ev] = api_key
+        return provider_name
+
+    return None
+
+
 @app.command("build")
 def build_cmd(
     path: str = typer.Option(".", "--path", "-p", help="Project root to index."),
@@ -62,18 +94,34 @@ def build_cmd(
 
         info(f"Building graph for [accent]{to_privacy_path(backend.root)}[/accent] ...")
 
-        # Check if any LLM API key is configured
-        has_api_key = any(
-            os.environ.get(k) for k in [
-                "OPENAI_API_KEY",
-                "ANTHROPIC_API_KEY",
-                "GOOGLE_API_KEY",
-                "GEMINI_API_KEY",
-                "GROQ_API_KEY",
-                "MISTRAL_API_KEY",
-                "OPENROUTER_API_KEY",
-            ]
-        )
+        # Setup Graphify credentials from active provider/store
+        active_provider = setup_graphify_credentials(backend.root)
+
+        if not active_provider:
+            warn(
+                "No AI provider configured.\n\n"
+                "Run:\n"
+                "  forge auth login\n"
+                "  forge provider use <provider>\n"
+                "  forge model use <model>\n\n"
+                "Continuing with syntax-only indexing..."
+            )
+            info("Building syntax-only graph (no LLM needed)...")
+            try:
+                result = await backend.update_graph(force=force, no_cluster=no_cluster)
+                snapshot = result.snapshot
+                get_console().print(
+                    f"  nodes:      [bold]{len(snapshot.nodes)}[/bold]\n"
+                    f"  edges:      [bold]{len(snapshot.edges)}[/bold]\n"
+                    f"  communities:[bold]{len(snapshot.communities)}[/bold]"
+                )
+                for label, value in result.artifacts.items():
+                    get_console().print(f"  [muted]{label}:[/muted] {to_privacy_path(value)}")
+                success("Syntax-only graph built successfully.")
+                return
+            except Exception as update_exc:
+                error(f"Syntax-only graph build failed: {update_exc}")
+                raise typer.Exit(code=1) from update_exc
 
         try:
             result = await backend.build(force=force, no_cluster=no_cluster)
@@ -88,17 +136,12 @@ def build_cmd(
             success("Graph built.")
         except Exception as exc:
             exc_msg = str(exc).lower()
-            is_key_issue = "api key" in exc_msg or "api_key" in exc_msg or "credentials" in exc_msg or "token" in exc_msg or not has_api_key
+            is_key_issue = "api key" in exc_msg or "api_key" in exc_msg or "credentials" in exc_msg or "token" in exc_msg
 
             if is_key_issue:
                 warn(
-                    "Semantic indexing failed or was skipped because no LLM API key is configured.\n"
-                    "Graphify requires an LLM API key for full semantic indexing (extracting inferred relationships).\n"
-                    "To enable semantic indexing, set one of the following environment variables:\n"
-                    "  - export GEMINI_API_KEY='your-key'\n"
-                    "  - export OPENAI_API_KEY='your-key'\n"
-                    "  - export ANTHROPIC_API_KEY='your-key'\n"
-                    "Falling back gracefully to syntax-only indexing (AST parsing)..."
+                    "Semantic indexing failed or was skipped because of API key issues.\n"
+                    "Continuing with syntax-only indexing..."
                 )
                 info("Building syntax-only graph (no LLM needed)...")
                 try:

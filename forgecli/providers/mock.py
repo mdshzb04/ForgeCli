@@ -51,34 +51,113 @@ class MockProvider(Provider[MockProviderConfig]):
 
         if has_diff_request:
             text_lower = text.lower()
-            if "html" in text_lower or "page" in text_lower:
-                content = (
-                    "diff --git a/index.html b/index.html\n"
-                    "new file mode 100644\n"
-                    "index 0000000..e69de29\n"
-                    "--- /dev/null\n"
-                    "+++ b/index.html\n"
-                    "@@ -0,0 +1,5 @@\n"
-                    "+<!DOCTYPE html>\n"
-                    "+<html>\n"
-                    "+<head><title>Simple Page</title></head>\n"
-                    "+<body><h1>Hello, World!</h1></body>\n"
-                    "+</html>\n"
+            if "next.js" in text_lower or "next" in text_lower or "page.tsx" in text_lower or "tsx" in text_lower:
+                filename = "page.tsx"
+                file_content = (
+                    "import React from 'react';\n"
+                    "export default function Page() {\n"
+                    "    return <div>Hello Next.js</div>;\n"
+                    "}\n"
+                )
+            elif "react" in text_lower or "app.jsx" in text_lower or "jsx" in text_lower:
+                filename = "App.jsx"
+                file_content = (
+                    "import React from 'react';\n"
+                    "export default function App() {\n"
+                    "    return <div>Hello React</div>;\n"
+                    "}\n"
+                )
+            elif "css" in text_lower or "styles.css" in text_lower:
+                filename = "styles.css"
+                file_content = (
+                    "body {\n"
+                    "    background-color: #f0f0f0;\n"
+                    "    color: #333;\n"
+                    "}\n"
+                )
+            elif "html" in text_lower or "index.html" in text_lower or "page" in text_lower:
+                filename = "index.html"
+                file_content = (
+                    "<!DOCTYPE html>\n"
+                    "<html>\n"
+                    "<head><title>Simple Page</title></head>\n"
+                    "<body><h1>Hello, World!</h1></body>\n"
+                    "</html>\n"
+                )
+            elif "typescript" in text_lower or "ts" in text_lower or "main.ts" in text_lower:
+                filename = "main.ts"
+                file_content = (
+                    "async function hello(): Promise<void> {\n"
+                    "    await Promise.resolve();\n"
+                    "    console.log(\"Hello TS\");\n"
+                    "}\n"
+                    "hello();\n"
+                )
+            elif "javascript" in text_lower or "js" in text_lower or "main.js" in text_lower:
+                filename = "main.js"
+                file_content = (
+                    "async function hello() {\n"
+                    "    await Promise.resolve();\n"
+                    "    console.log(\"Hello\");\n"
+                    "}\n"
+                    "hello();\n"
+                )
+            elif "go" in text_lower or "main.go" in text_lower:
+                filename = "main.go"
+                file_content = (
+                    "package main\n"
+                    "\n"
+                    "import \"fmt\"\n"
+                    "\n"
+                    "func main() {\n"
+                    "    fmt.Println(\"Hello Go\")\n"
+                    "}\n"
+                )
+            elif "rust" in text_lower or "rs" in text_lower or "main.rs" in text_lower:
+                filename = "main.rs"
+                file_content = (
+                    "fn main() {\n"
+                    "    println!(\"Hello Rust\");\n"
+                    "}\n"
+                )
+            elif "json" in text_lower or "data.json" in text_lower:
+                filename = "data.json"
+                file_content = (
+                    "{\n"
+                    "    \"message\": \"Hello JSON\"\n"
+                    "}\n"
+                )
+            elif "yaml" in text_lower or "yml" in text_lower or "config.yaml" in text_lower:
+                filename = "config.yaml"
+                file_content = (
+                    "message: Hello YAML\n"
+                )
+            elif "markdown" in text_lower or "md" in text_lower or "readme.md" in text_lower:
+                filename = "README.md"
+                file_content = (
+                    "# Hello Markdown\n"
                 )
             else:
-                content = (
-                    "diff --git a/main.py b/main.py\n"
-                    "new file mode 100644\n"
-                    "index 0000000..e69de29\n"
-                    "--- /dev/null\n"
-                    "+++ b/main.py\n"
-                    "@@ -0,0 +1,5 @@\n"
-                    "+def main():\n"
-                    "+    print(\"Hello from mock build!\")\n"
-                    "+\n"
-                    "+if __name__ == '__main__':\n"
-                    "+    main()\n"
+                filename = "main.py"
+                file_content = (
+                    "def main():\n"
+                    "    print(\"Hello from mock build!\")\n"
+                    "\n"
+                    "if __name__ == '__main__':\n"
+                    "    main()\n"
                 )
+
+            diff_lines = [f"+{line}" for line in file_content.splitlines()]
+            diff_content = "\n".join(diff_lines) + "\n"
+            content = (
+                f"diff --git a/{filename} b/{filename}\n"
+                f"new file mode 100644\n"
+                f"index 0000000..e69de29\n"
+                f"--- /dev/null\n"
+                f"+++ b/{filename}\n"
+                f"@@ -0,0 +{len(diff_lines)} @@\n"
+                f"{diff_content}"
+            )
         else:
             content = f"[mock] {text}"
 

@@ -339,10 +339,48 @@ def render_pipeline_result(
     verbose: bool,
     diff: bool,
 ) -> None:
+    from rich import box
     from rich.panel import Panel
     from rich.syntax import Syntax
 
     console = get_console()
+
+    if not verbose:
+        # Clean / Minimal Mode
+        if success:
+            console.print("[bold green]✓ Build completed[/bold green]\n")
+        else:
+            if diff_text:
+                console.print("[bold orange3]⚠ Generated successfully[/bold orange3]\n")
+                console.print("Could not automatically apply changes.\n")
+                console.print("The generated files are shown below.\n")
+            else:
+                console.print("[bold red]✗ Build failed[/bold red]\n")
+
+        console.print("────────────────────────────────────────────\n")
+
+        changes = get_display_changes(diff_text)
+        for chg in changes:
+            path = chg["path"]
+            content = chg["content"]
+
+            console.print(f"[bold orange3]{path}[/bold orange3]\n")
+            lexer = get_lexer(path)
+            syntax = Syntax(content.rstrip(), lexer, theme="monokai")
+            panel = Panel(
+                syntax,
+                border_style="orange3",
+                box=box.ROUNDED,
+                expand=False,
+            )
+            console.print(panel)
+            console.print()
+
+        total_time = sum(float(getattr(s, "duration_seconds", 0.0) or 0.0) for s in stages)
+        console.print(f"Time: {total_time:.1f} s\n")
+        return
+
+    # Verbose Mode
     console.print("────────────────────────────────────────\n")
     if success:
         console.print("[bold green]✓ Build completed[/bold green]\n")
@@ -351,31 +389,11 @@ def render_pipeline_result(
         if failure_stage:
             console.print(f"Failed at stage: [bold red]{failure_stage}[/bold red]\n")
 
-    # Print the files
-    changes = get_display_changes(diff_text)
-    if not (verbose or diff):
-        for chg in changes:
-            status = chg["status"]
-            path = chg["path"]
-            content = chg["content"]
-
-            console.print(f"[bold]{status}[/bold]\n")
-            console.print(f"[bold cyan]{path}[/bold cyan]\n")
-
-            lexer = get_lexer(path)
-            syntax = Syntax(content.rstrip(), lexer, theme="monokai")
-            panel = Panel(
-                syntax,
-                border_style="blue",
-                expand=False,
-            )
-            console.print(panel)
-            console.print()
-    else:
-        if diff_text:
-            console.print("[bold cyan]Unified Diff:[/bold cyan]\n")
-            console.print(diff_text)
-            console.print()
+    # Print the files in verbose or diff mode
+    if diff_text:
+        console.print("[bold cyan]Unified Diff:[/bold cyan]\n")
+        console.print(diff_text)
+        console.print()
 
     # Print summary
     provider_map = {
@@ -403,12 +421,6 @@ def render_pipeline_result(
     console.print("[bold]Optimizer[/bold]")
     console.print(optimizer_str)
     console.print()
-    diff_files = [chg["path"] for chg in changes]
-    if diff_files and not (verbose or diff):
-        # We only display this in clean mode
-        console.print("[bold]Output Files[/bold]")
-        console.print(", ".join(diff_files))
-        console.print()
     console.print("[bold]Tests[/bold]")
     console.print(tests_str)
     console.print()
@@ -422,8 +434,8 @@ def render_pipeline_result(
         for s in stages:
             name = getattr(s, "stage", None) or getattr(s, "name", "Stage")
             status_val = getattr(s, "status", None)
-            if hasattr(status_val, "value"):
-                status_val = status_val.value
+            if status_val is not None and hasattr(status_val, "value"):
+                status_val = status_val.value  # type: ignore[union-attr]
             duration = getattr(s, "duration_seconds", 0.0) or 0.0
             err = getattr(s, "error", None) or "—"
             rows.append([str(name), str(status_val), f"{duration:.3f}s", str(err)])

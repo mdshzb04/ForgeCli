@@ -249,7 +249,7 @@ def resolve_provider_and_decision(
     decision = router.select(state.choice)
 
     if not live:
-        provider = MockProvider(MockProviderConfig())
+        provider: Any = MockProvider(MockProviderConfig())
         decision = RouteDecision(
             provider_name="mock",
             model=decision.model,
