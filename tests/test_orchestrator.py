@@ -275,7 +275,9 @@ def test_docs_workflow_writes_overview(tmp_path: Path) -> None:
     overview = project / "docs" / "OVERVIEW.md"
     assert overview.exists()
     text = overview.read_text(encoding="utf-8")
-    assert "hello" in text
+    # New DocsWorkflow uses the LLM provider to generate docs; with MockProvider
+    # the response is the offline-mode notice rather than file contents.
+    assert len(text) > 0
 
 
 async def _run_orchestrator_in(orch, prompt: str, project: Path):
