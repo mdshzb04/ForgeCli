@@ -351,20 +351,22 @@ def render_pipeline_result(
             console.print("[bold green]✓ Build completed[/bold green]\n")
         else:
             if diff_text:
-                console.print("[bold orange3]⚠ Generated successfully[/bold orange3]\n")
-                console.print("Could not automatically apply changes.\n")
-                console.print("The generated files are shown below.\n")
+                console.print("[bold orange3]⚠ Couldn't automatically apply the generated changes.[/bold orange3]\n")
+                console.print("The generated code is shown below.\n")
             else:
                 console.print("[bold red]✗ Build failed[/bold red]\n")
 
         console.print("────────────────────────────────────────────\n")
 
         changes = get_display_changes(diff_text)
+        if changes:
+            console.print("Created Files\n")
         for chg in changes:
             path = chg["path"]
             content = chg["content"]
+            status = chg["status"]
 
-            console.print(f"[bold orange3]{path}[/bold orange3]\n")
+            console.print(f"📄 {path}\n")
             lexer = get_lexer(path)
             syntax = Syntax(content.rstrip(), lexer, theme="monokai")
             panel = Panel(
@@ -376,8 +378,12 @@ def render_pipeline_result(
             console.print(panel)
             console.print()
 
+            line_count = len(content.splitlines())
+            console.print(f"{status} {path}")
+            console.print(f"{line_count} lines generated.\n")
+
         total_time = sum(float(getattr(s, "duration_seconds", 0.0) or 0.0) for s in stages)
-        console.print(f"Time: {total_time:.1f} s\n")
+        console.print(f"Completed in {total_time:.1f} s\n")
         return
 
     # Verbose Mode

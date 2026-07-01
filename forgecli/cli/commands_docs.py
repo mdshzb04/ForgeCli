@@ -8,7 +8,7 @@ from pathlib import Path
 import typer
 
 from forgecli.cli.bootstrap import bootstrap_context
-from forgecli.cli.ui import error, get_console, success, warn
+from forgecli.cli.ui import error, get_console, warn
 from forgecli.docs.generator import generate_docs
 from forgecli.orchestrator import (
     DocsWorkflow,
@@ -69,33 +69,51 @@ async def _run_docs(path: Path, output: Path | None, live: bool, verbose: bool =
 
         from forgecli.cli.ui import table
         console = get_console()
-        console.print("────────────────────────────────────────\n")
-        if result.summary:
-            console.print(result.summary)
+        console.print("[bold green]✓ Documentation generated[/bold green]\n")
+        console.print("────────────────────────────────────────────\n")
+
+        dest = output or Path("docs/OVERVIEW.md")
+        dest_path = path / dest
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        dest_path.write_text(result.summary or "", encoding="utf-8")
+
+        from rich import box
+        from rich.panel import Panel
+        from rich.syntax import Syntax
+
+        console.print(f"📄 {dest}\n")
+        syntax = Syntax((result.summary or "").rstrip(), "markdown", theme="monokai")
+        panel = Panel(
+            syntax,
+            border_style="orange3",
+            box=box.ROUNDED,
+            expand=False,
+        )
+        console.print(panel)
+        console.print()
+
+        if verbose:
+            provider_name = decision.provider_name if decision else "mock"
+            provider_map = {
+                "mock": "Mock (Offline)",
+                "openai": "OpenAI (Live)",
+                "anthropic": "Anthropic (Live)",
+                "google": "Gemini (Live)",
+                "gemini": "Gemini (Live)",
+            }
+            provider_str = provider_map.get(provider_name.lower(), f"{provider_name.title()} (Live)")
+
+            console.print("[bold]Provider[/bold]")
+            console.print(provider_str)
+            console.print()
+            console.print("[bold]Output Files[/bold]")
+            console.print(str(dest))
+            console.print()
+            console.print("[bold]Time[/bold]")
+            console.print(f"{result.duration_seconds:.1f} seconds")
             console.print()
 
-        # concise summary block
-        provider_name = decision.provider_name if decision else "mock"
-        provider_map = {
-            "mock": "Mock (Offline)",
-            "openai": "OpenAI (Live)",
-            "anthropic": "Anthropic (Live)",
-            "google": "Gemini (Live)",
-            "gemini": "Gemini (Live)",
-        }
-        provider_str = provider_map.get(provider_name.lower(), f"{provider_name.title()} (Live)")
-
-        console.print("[bold]Provider[/bold]")
-        console.print(provider_str)
-        console.print()
-        console.print("[bold]Output Files[/bold]")
-        console.print(str(output or "docs/OVERVIEW.md"))
-        console.print()
-        console.print("[bold]Time[/bold]")
-        console.print(f"{result.duration_seconds:.1f} seconds")
-        console.print()
-
-        if verbose and result.stages:
+            if result.stages:
                 console.print("[bold yellow]=== Pipeline Stages timings ===[/bold yellow]\n")
                 rows = []
                 for s in result.stages:
@@ -107,8 +125,7 @@ async def _run_docs(path: Path, output: Path | None, live: bool, verbose: bool =
                     ])
                 table(["Stage", "Status", "Duration", "Error"], rows, title="Pipeline stages")
                 console.print()
-
-        console.print("────────────────────────────────────────")
+            console.print("────────────────────────────────────────")
     except Exception as exc:
         warn(f"Live provider could not be used ({exc}). Falling back to static documentation generator.")
         try:
@@ -116,17 +133,37 @@ async def _run_docs(path: Path, output: Path | None, live: bool, verbose: bool =
             target = generate_docs(context, output=output)
 
             console = get_console()
-            console.print("────────────────────────────────────────\n")
-            success(f"Documentation written to {target}")
-            console.print(f"  [muted]{target}[/muted]\n")
+            console.print("[bold green]✓ Documentation generated[/bold green]\n")
+            console.print("────────────────────────────────────────────\n")
 
-            console.print("[bold]Provider[/bold]")
-            console.print("Static Scanner")
+            rel_target = target.relative_to(path) if path in target.parents else target
+            console.print(f"📄 {rel_target}\n")
+
+            from rich import box
+            from rich.panel import Panel
+            from rich.syntax import Syntax
+            try:
+                content = target.read_text(encoding="utf-8")
+            except Exception:
+                content = ""
+            syntax = Syntax(content.rstrip(), "markdown", theme="monokai")
+            panel = Panel(
+                syntax,
+                border_style="orange3",
+                box=box.ROUNDED,
+                expand=False,
+            )
+            console.print(panel)
             console.print()
-            console.print("[bold]Output Files[/bold]")
-            console.print(str(target.relative_to(path) if path in target.parents else target))
-            console.print()
-            console.print("────────────────────────────────────────")
+
+            if verbose:
+                console.print("[bold]Provider[/bold]")
+                console.print("Static Scanner")
+                console.print()
+                console.print("[bold]Output Files[/bold]")
+                console.print(str(rel_target))
+                console.print()
+                console.print("────────────────────────────────────────")
         except Exception as e:
             error(f"Failed to generate docs: {e}")
             raise typer.Exit(code=1) from None

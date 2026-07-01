@@ -70,34 +70,36 @@ async def _run_ask(question: str, path: Path, live: bool, verbose: bool = False)
 
         from forgecli.cli.ui import table
         console = get_console()
-        console.print("────────────────────────────────────────\n")
+        console.print("[bold green]✓ Answer generated[/bold green]\n")
+        console.print("────────────────────────────────────────────\n")
         if result.summary:
             console.print(Markdown(result.summary.strip()))
         else:
             console.print("(no answer)")
         console.print()
 
-        provider_name = decision.provider_name if decision else "mock"
-        provider_map = {
-            "mock": "Mock (Offline)",
-            "openai": "OpenAI (Live)",
-            "anthropic": "Anthropic (Live)",
-            "google": "Gemini (Live)",
-            "gemini": "Gemini (Live)",
-        }
-        provider_str = provider_map.get(provider_name.lower(), f"{provider_name.title()} (Live)")
+        if verbose:
+            provider_name = decision.provider_name if decision else "mock"
+            provider_map = {
+                "mock": "Mock (Offline)",
+                "openai": "OpenAI (Live)",
+                "anthropic": "Anthropic (Live)",
+                "google": "Gemini (Live)",
+                "gemini": "Gemini (Live)",
+            }
+            provider_str = provider_map.get(provider_name.lower(), f"{provider_name.title()} (Live)")
 
-        console.print("[bold]Provider[/bold]")
-        console.print(provider_str)
-        console.print()
-        console.print("[bold]Optimizer[/bold]")
-        console.print("Ponytail (Ultra)")
-        console.print()
-        console.print("[bold]Time[/bold]")
-        console.print(f"{result.duration_seconds:.1f} seconds")
-        console.print()
+            console.print("[bold]Provider[/bold]")
+            console.print(provider_str)
+            console.print()
+            console.print("[bold]Optimizer[/bold]")
+            console.print("Ponytail (Ultra)")
+            console.print()
+            console.print("[bold]Time[/bold]")
+            console.print(f"{result.duration_seconds:.1f} seconds")
+            console.print()
 
-        if verbose and result.stages:
+            if result.stages:
                 console.print("[bold yellow]=== Pipeline Stages timings ===[/bold yellow]\n")
                 rows = []
                 for s in result.stages:
@@ -109,8 +111,7 @@ async def _run_ask(question: str, path: Path, live: bool, verbose: bool = False)
                     ])
                 table(["Stage", "Status", "Duration", "Error"], rows, title="Pipeline stages")
                 console.print()
-
-        console.print("────────────────────────────────────────")
+            console.print("────────────────────────────────────────")
     except Exception as exc:
         error(f"Failed to get answer from provider: {exc}")
         raise typer.Exit(code=1) from None

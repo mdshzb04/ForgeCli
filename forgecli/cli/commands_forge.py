@@ -226,38 +226,69 @@ async def run_forge(
 
 
 def render_result(result, verbose: bool = False, diff: bool = False) -> None:
+    from rich import box
+    from rich.panel import Panel
+    from rich.syntax import Syntax
+
+    from forgecli.cli.commands_build import get_display_changes, get_lexer
+
     console = get_console()
+
+    if not verbose:
+        if result.success:
+            console.print("[bold green]✓ Forge completed[/bold green]\n")
+        else:
+            if result.diff:
+                console.print("[bold orange3]⚠ Couldn't automatically apply the generated changes.[/bold orange3]\n")
+                console.print("The generated code is shown below.\n")
+            else:
+                console.print("[bold red]✗ Forge failed[/bold red]\n")
+
+        console.print("────────────────────────────────────────────\n")
+
+        changes = get_display_changes(result.diff)
+        if changes:
+            console.print("Created Files\n")
+        for chg in changes:
+            path = chg["path"]
+            content = chg["content"]
+            status = chg["status"]
+
+            console.print(f"📄 {path}\n")
+            lexer = get_lexer(path)
+            syntax = Syntax(content.rstrip(), lexer, theme="monokai")
+            panel = Panel(
+                syntax,
+                border_style="orange3",
+                box=box.ROUNDED,
+                expand=False,
+            )
+            console.print(panel)
+            console.print()
+
+            line_count = len(content.splitlines())
+            console.print(f"{status} {path}")
+            console.print(f"{line_count} lines generated.\n")
+
+        if result.summary and result.workflow not in ("build", "legacy"):
+            from rich.markdown import Markdown
+            console.print(Markdown(result.summary.strip()))
+            console.print()
+
+        console.print(f"Completed in {result.duration_seconds:.1f} s\n")
+        return
+
+    # Verbose Mode
     console.print("────────────────────────────────────────\n")
     if result.success:
         console.print("[bold green]✓ Forge completed[/bold green]\n")
     else:
         console.print("[bold red]✗ Forge failed[/bold red]\n")
 
-    from rich.panel import Panel
-    from rich.syntax import Syntax
-
-    from forgecli.cli.commands_build import get_display_changes, get_lexer
-
-    changes = get_display_changes(result.diff)
-    if not (verbose or diff):
-        for chg in changes:
-            status = chg["status"]
-            path = chg["path"]
-            content = chg["content"]
-
-            console.print(f"[bold]{status}[/bold]\n")
-            console.print(f"[bold cyan]{path}[/bold cyan]\n")
-
-            lexer = get_lexer(path)
-            syntax = Syntax(content.rstrip(), lexer, theme="monokai")
-            panel = Panel(syntax, border_style="blue", expand=False)
-            console.print(panel)
-            console.print()
-    else:
-        if result.diff:
-            console.print("[bold cyan]Unified Diff:[/bold cyan]\n")
-            console.print(result.diff)
-            console.print()
+    if result.diff:
+        console.print("[bold cyan]Unified Diff:[/bold cyan]\n")
+        console.print(result.diff)
+        console.print()
 
     # Try to find provider name
     provider_name = "mock"
@@ -288,28 +319,22 @@ def render_result(result, verbose: bool = False, diff: bool = False) -> None:
     console.print(provider_str)
     console.print()
 
-    diff_files = [chg["path"] for chg in changes]
-    if diff_files and not (verbose or diff):
-        console.print("[bold]Output Files[/bold]")
-        console.print(", ".join(diff_files))
-        console.print()
-
     console.print("[bold]Time[/bold]")
     console.print(f"{result.duration_seconds:.1f} seconds")
     console.print()
 
-    if verbose and result.stages:
-            console.print("[bold yellow]=== Pipeline Stages timings ===[/bold yellow]\n")
-            rows = []
-            for s in result.stages:
-                rows.append([
-                    str(s.get("name", "Stage")),
-                    str(s.get("status", "succeeded")),
-                    f"{float(s.get('duration_seconds') or 0.0):.3f}s",
-                    str(s.get("error") or "—")
-                ])
-            table(["Stage", "Status", "Duration", "Error"], rows, title="Pipeline stages")
-            console.print()
+    if result.stages:
+        console.print("[bold yellow]=== Pipeline Stages timings ===[/bold yellow]\n")
+        rows = []
+        for s in result.stages:
+            rows.append([
+                str(s.get("name", "Stage")),
+                str(s.get("status", "succeeded")),
+                f"{float(s.get('duration_seconds') or 0.0):.3f}s",
+                str(s.get("error") or "—")
+            ])
+        table(["Stage", "Status", "Duration", "Error"], rows, title="Pipeline stages")
+        console.print()
 
     console.print("────────────────────────────────────────")
 
