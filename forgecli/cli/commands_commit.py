@@ -1,11 +1,23 @@
-"""``forge commit`` subcommand: AI-powered commit generator."""
+"""``forge commit`` subcommand: ultra-fast AI-powered commit generator.
+
+Bypasses Caveman, , Graphify, and all prompt optimization.
+Reads only the staged git diff, sends it to the configured model
+with a minimal system prompt, generates a Conventional Commit message,
+previews it, requests confirmation, then commits.
+"""
 
 from __future__ import annotations
 
+import asyncio
+import os
+import re
 import subprocess
 from pathlib import Path
 
 import typer
+from rich.box import ROUNDED
+from rich.panel import Panel
+from rich.text import Text
 
 from forgecli.cli.ui import get_console
 from forgecli.commit.git_utils import (
@@ -15,11 +27,79 @@ from forgecli.commit.git_utils import (
     is_git_repo,
     status_porcelain,
 )
+from forgecli.providers.base import ChatMessage, ChatRequest, Role
 
 app = typer.Typer(
     help="AI-powered Conventional Commit generator.",
     rich_markup_mode="rich",
 )
+
+_COMMIT_SYSTEM_PROMPT = (
+    "Write a Conventional Commit message. "
+    "Type: feat, fix, docs, refactor, perf, test, chore, build, ci. "
+    "Optional scope in parens. Subject line under 72 chars. "
+    "Blank line, then bullet list of changes. "
+    "Output ONLY the commit message, no explanation."
+)
+
+
+def _resolve_provider_for_commit() -> tuple[str, str, str]:
+    """Quick provider resolution — no DI container, no bootstrap.
+
+    Returns (provider_name, model, api_key_env).
+    """
+    for name, env_var in [
+        ("openai", "OPENAI_API_KEY"),
+        ("anthropic", "ANTHROPIC_API_KEY"),
+        ("google", "GOOGLE_API_KEY"),
+    ]:
+        if os.environ.get(env_var):
+            model = {"openai": "gpt-4o-mini", "anthropic": "claude-haiku-4.5", "google": "gemini-2.5-flash"}[name]
+            return name, model, env_var
+
+    from forgecli.core.credentials import get_api_key
+    for name in ("openai", "anthropic", "google"):
+        if get_api_key(name):
+            model = {"openai": "gpt-4o-mini", "anthropic": "claude-haiku-4.5", "google": "gemini-2.5-flash"}[name]
+            return name, model, ""
+
+    raise typer.Exit(code=1)
+
+
+def get_staged_stats(project_path: Path) -> dict[str, int]:
+    lines = status_porcelain(project_path)
+    modified = added = deleted = 0
+    for line in lines:
+        if len(line) < 2:
+            continue
+        x = line[0]
+        if x in ("M", "R"):
+            modified += 1
+        elif x in ("A", "C"):
+            added += 1
+        elif x == "D":
+            deleted += 1
+    return {"modified": modified, "added": added, "deleted": deleted}
+
+
+def sanitize_commit_message(commit_message: str) -> str:
+    """Strip internal optimization terms from the commit message."""
+    terms = ["ponytail", "yagni", "caveman", "graphify", "safe\\s+because", "prompt optimization", "reasoning"]
+    pattern = re.compile(r"(?i)\b(" + "|".join(terms) + r")\b")
+    lines = commit_message.splitlines()
+    cleaned = []
+    for line in lines:
+        if pattern.search(line):
+            stripped = line.strip()
+            if any(stripped.startswith(c) for c in ("-", "*", "\u2022")):
+                continue
+            line = pattern.sub("", line)
+            line = re.sub(r"\s+", " ", line).strip()
+            if line:
+                cleaned.append(line)
+        else:
+            cleaned.append(line)
+    return "\n".join(cleaned).strip()
 
 
 @app.callback(invoke_without_command=True)
@@ -30,72 +110,10 @@ def commit_cmd(
     """Generate a semantic commit message and create the commit."""
     if ctx.invoked_subcommand is not None:
         return
-
-    import asyncio
-    asyncio.run(run_commit_workflow(Path(path)))
+    asyncio.run(_run_commit(Path(path)))
 
 
-def get_staged_stats(project_path: Path) -> dict[str, int]:
-    lines = status_porcelain(project_path)
-    modified = 0
-    added = 0
-    deleted = 0
-    for line in lines:
-        if len(line) < 2:
-            continue
-        x = line[0]
-        # X is the status of the index (staged)
-        if x in ('M', 'R'):
-            modified += 1
-        elif x in ('A', 'C'):
-            added += 1
-        elif x == 'D':
-            deleted += 1
-    return {"modified": modified, "added": added, "deleted": deleted}
-
-
-def sanitize_commit_message(commit_message: str) -> str:
-    """Sanitize the commit message to remove optimization instructions/notes."""
-    import re
-    _terms = [
-        "".join(["p", "o", "n", "y", "t", "a", "i", "l"]),
-        "".join(["y", "a", "g", "n", "i"]),
-        "safe\\s+because",
-        "prompt\\s+notes",
-        "system\\s+instructions",
-        "".join(["r", "e", "a", "s", "o", "n", "i", "n", "g"])
-    ]
-    forbidden_pattern = re.compile(
-        r'(?i)\b(' + '|'.join(_terms) + r')\b|\bcut:'
-    )
-    commit_lines = commit_message.splitlines()
-    cleaned_commit_lines = []
-    for line in commit_lines:
-        if forbidden_pattern.search(line):
-            stripped = line.strip()
-            # If it's a list item / bullet point, skip it
-            if any(stripped.startswith(c) for c in ("-", "*", "•")):
-                continue
-            # Otherwise, strip the forbidden terms from the line
-            cleaned_line = forbidden_pattern.sub("", line)
-            cleaned_line = re.sub(r'\s+', ' ', cleaned_line).strip()
-            if cleaned_line:
-                cleaned_commit_lines.append(cleaned_line)
-        else:
-            cleaned_commit_lines.append(line)
-    return "\n".join(cleaned_commit_lines).strip()
-
-
-
-async def run_commit_workflow(project_path: Path) -> None:
-    from rich.box import ROUNDED
-    from rich.panel import Panel
-    from rich.text import Text
-
-    from forgecli.cli.bootstrap import bootstrap_context, resolve_provider_and_decision
-    from forgecli.optimizer.ponytail import PromptOptimizer
-    from forgecli.providers.base import ChatMessage, ChatRequest, Role
-
+async def _run_commit(project_path: Path) -> None:
     console = get_console()
 
     if not is_git_repo(project_path):
@@ -107,49 +125,31 @@ async def run_commit_workflow(project_path: Path) -> None:
         console.print("No staged changes found.\nRun:\n  git add <files>\nbefore using forge commit.")
         raise typer.Exit(code=1)
 
+    provider_name, model, api_key_env = _resolve_provider_for_commit()
+    api_key = os.environ.get(api_key_env)
+    if not api_key:
+        from forgecli.core.credentials import get_api_key
+        api_key = get_api_key(provider_name)
+    if not api_key:
+        console.print("[red]No API key found. Run `forge auth login` first.[/red]")
+        raise typer.Exit(code=1)
+
+    system_prompt = _COMMIT_SYSTEM_PROMPT
     prompt = (
-        "Analyze the following git diff and generate a concise Conventional Commit message. "
-        "It must follow the conventional commits specification: start with a type (e.g., feat, fix, docs, style, refactor, perf, test, chore, build, ci), optional scope, and a short description. "
-        "Then, optionally add a list of bullet points outlining the changes. "
-        "Output ONLY the raw commit message text. Do not include markdown block quotes, fences, backticks, or any other explanations.\n\n"
         f"Git Diff:\n{diff}"
     )
 
     with console.status("[bold yellow]Thinking...[/bold yellow]", spinner="dots"):
-        app_context = bootstrap_context(cwd=project_path)
-        optimizer = app_context.container.resolve(PromptOptimizer)
+        provider = _build_provider(provider_name, api_key)
         request = ChatRequest(
-            messages=[ChatMessage(role=Role.USER, content=prompt)],
-        )
-        optimized = await optimizer.optimize_chat(request)
-        optimized_prompt = optimized.request.messages[0].content
-
-        provider, decision = resolve_provider_and_decision(live=True, cwd=project_path)
-        raw_provider = provider._base if hasattr(provider, "_base") else provider
-
-        commit_request = ChatRequest(
-            model=decision.model if decision else None,
+            model=model,
             messages=[
-                ChatMessage(
-                    role=Role.SYSTEM,
-                    content=(
-                        "You are a senior software engineer specialized in creating concise Conventional Commit messages. "
-                        "Write clean, human-quality Conventional Commits like experienced maintainers. "
-                        "Focus only on describing the actual codebase changes.\n\n"
-                        "Format example:\n"
-                        "feat(cli): improve build workflow output\n\n"
-                        "- redesign build result UI\n"
-                        "- add syntax-highlighted code previews\n"
-                        "- simplify offline mode messaging\n"
-                        "- improve CLI presentation\n\n"
-                        "Output ONLY the raw commit message. Do not include markdown fences, backticks, or any explanation."
-                    )
-                ),
-                ChatMessage(role=Role.USER, content=optimized_prompt),
+                ChatMessage(role=Role.SYSTEM, content=system_prompt),
+                ChatMessage(role=Role.USER, content=prompt),
             ],
         )
 
-        response = await raw_provider.chat(commit_request)
+        response = await provider.chat(request)
         commit_message = response.message.content.strip()
 
     if commit_message.startswith("```"):
@@ -173,9 +173,8 @@ async def run_commit_workflow(project_path: Path) -> None:
         parts.append(f"{stats['added']} added")
     if stats["deleted"] > 0:
         parts.append(f"{stats['deleted']} deleted")
-    stats_str = " • ".join(parts) if parts else "0 modified • 0 added • 0 deleted"
+    stats_str = " \u2022 ".join(parts) if parts else "0 modified \u2022 0 added \u2022 0 deleted"
 
-    # Display the message inside a beautiful Rich panel with repo, branch, and changed files
     preview_text = Text()
     preview_text.append("Repository  ", style="bold cyan")
     preview_text.append(f"{repo_name}\n", style="white")
@@ -183,7 +182,7 @@ async def run_commit_workflow(project_path: Path) -> None:
     preview_text.append(f"{branch_name}\n", style="white")
     preview_text.append("Files       ", style="bold cyan")
     preview_text.append(f"{stats_str}\n\n", style="white")
-    preview_text.append("────────────────────────────────────────\n\n", style="dim")
+    preview_text.append("\u2500" * 40 + "\n\n", style="dim")
     preview_text.append(commit_message, style="white")
 
     panel = Panel(
@@ -210,7 +209,6 @@ async def run_commit_workflow(project_path: Path) -> None:
         console.print(f"[bold red]Error committing changes:[/bold red] {exc}")
         raise typer.Exit(code=1) from exc
 
-    # After committing, show post-commit details
     try:
         commit_hash = _run_git(["rev-parse", "HEAD"], project_path).strip()
         short_hash = commit_hash[:7]
@@ -225,7 +223,7 @@ async def run_commit_workflow(project_path: Path) -> None:
     summary_text.append(f"{branch_name}\n\n", style="white")
     summary_text.append("Files\n", style="bold cyan")
     summary_text.append(f"{stats_str}\n\n", style="white")
-    summary_text.append("  - [bold green]✓ Commit Created[/bold green]\n")
+    summary_text.append("  - [bold green]\u2713 Commit Created[/bold green]\n")
     summary_text.append(f"  - [bold]Commit hash:[/bold] {short_hash}\n")
     summary_text.append(f"  - [bold]Branch:[/bold] {branch_name}\n")
     summary_text.append(f"  - [bold]Commit message:[/bold] {commit_message.splitlines()[0]}\n")
@@ -241,8 +239,22 @@ async def run_commit_workflow(project_path: Path) -> None:
     console.print(post_panel)
 
 
+def _build_provider(provider_name: str, api_key: str):
+    """Build a provider instance directly — no DI, no registry, no bootstrap."""
+    if provider_name == "openai":
+        from forgecli.providers.openai import OpenAIProvider
+        return OpenAIProvider(api_key=api_key)
+    elif provider_name == "anthropic":
+        from forgecli.providers.anthropic import AnthropicProvider
+        return AnthropicProvider(api_key=api_key)
+    elif provider_name == "google":
+        from forgecli.providers.google import GeminiProvider
+        return GeminiProvider(api_key=api_key)
+    else:
+        raise RuntimeError(f"Unknown provider: {provider_name}")
+
+
 def _run_git(args: list[str], project: Path) -> str:
-    """Run a git command and return stdout, raising on failure."""
     result = subprocess.run(
         ["git", *args],
         cwd=str(project),
