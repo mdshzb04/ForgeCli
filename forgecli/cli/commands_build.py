@@ -67,8 +67,8 @@ def build_cmd(
     no_graph: bool = typer.Option(False, "--no-graph", help="Skip Graphify retrieval."),
     no_ponytail: bool = typer.Option(
         False,
-        "--no-",
-        help="Skip  prompt optimization.",
+        "--no-ponytail",
+        help="Skip prompt optimization.",
     ),
     retries: int = typer.Option(
         0,
